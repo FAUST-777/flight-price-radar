@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>機票價格雷達 Flight Price Radar</title>
+<style>
+:root {
+  color-scheme: light;
+  --page:      #f9f9f7;
+  --surface:   #fcfcfb;
+  --ink:       #0b0b0b;
+  --ink-2:     #52514e;
+  --muted:     #898781;
+  --grid:      #e1e0d9;
+  --baseline:  #c3c2b7;
+  --border:    rgba(11,11,11,0.10);
+  --accent:    #2a78d6;
+  --spark:     #86b6ef;
+  --critical:  #d03b3b;
+  --critical-bg: rgba(208,59,59,0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --baseline:  #383835;
+    --border:    rgba(255,255,255,0.10);
+    --accent:    #3987e5;
+    --spark:     #5598e7;
+    --critical:  #d03b3b;
+    --critical-bg: rgba(208,59,59,0.18);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:      #0d0d0d;
+  --surface:   #1a1a19;
+  --ink:       #ffffff;
+  --ink-2:     #c3c2b7;
+  --muted:     #898781;
+  --grid:      #2c2c2a;
+  --baseline:  #383835;
+  --border:    rgba(255,255,255,0.10);
+  --accent:    #3987e5;
+  --spark:     #5598e7;
+  --critical:  #d03b3b;
+  --critical-bg: rgba(208,59,59,0.18);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+  line-height: 1.5;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 56px; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 22px; margin: 0; }
+.sub { color: var(--ink-2); font-size: 13px; }
+.updated { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+.controls {
+  display: flex; align-items: center; gap: 8px;
+  margin: 16px 0 20px; flex-wrap: wrap;
+}
+.tab {
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+  padding: 6px 16px; border-radius: 999px; font-size: 14px; cursor: pointer;
+}
+.tab[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+.theme-btn {
+  margin-left: auto; border: 1px solid var(--border); background: var(--surface);
+  color: var(--ink-2); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+}
+
+.banner {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; color: var(--ink-2); margin-bottom: 16px;
+}
+.banner.error { border-color: var(--critical); }
+
+section h2 { font-size: 17px; margin: 26px 0 12px; }
+section h2 .count { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px 12px; cursor: pointer; text-align: left; font: inherit; color: inherit;
+  display: flex; flex-direction: column; gap: 6px; min-height: 148px;
+}
+.card:hover { border-color: var(--accent); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card .top { display: flex; align-items: center; gap: 8px; }
+.card .city { font-weight: 700; font-size: 15px; }
+.card .code { color: var(--muted); font-size: 12px; }
+.chip {
+  margin-left: auto; color: var(--critical); background: var(--critical-bg);
+  font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
+.price-row { display: flex; align-items: flex-end; gap: 10px; }
+.price { font-size: 26px; font-weight: 600; }
+.price.na { color: var(--muted); font-weight: 400; font-size: 15px; }
+.spark { margin-left: auto; flex: none; }
+.meta { color: var(--ink-2); font-size: 12.5px; }
+.target-line { color: var(--muted); font-size: 12px; }
+
+dialog {
+  border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--ink);
+  width: min(720px, calc(100vw - 32px)); padding: 20px;
+}
+dialog::backdrop { background: rgba(0,0,0,0.45); }
+.d-head { display: flex; align-items: baseline; gap: 10px; }
+.d-head h3 { margin: 0; font-size: 18px; }
+.d-close {
+  margin-left: auto; border: 1px solid var(--border); background: none; color: var(--ink-2);
+  border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 14px;
+}
+.view-toggle { display: flex; gap: 6px; margin: 14px 0 6px; }
+.view-toggle button {
+  border: 1px solid var(--border); background: none; color: var(--ink-2);
+  padding: 3px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
+}
+.view-toggle button[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); }
+.chart-box { position: relative; }
+.chart-box svg { display: block; width: 100%; height: auto; }
+.chart-box svg:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
+.tooltip {
+  position: absolute; pointer-events: none; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18); font-size: 12px; display: none; z-index: 5;
+}
+.tooltip .val { font-size: 14px; font-weight: 700; color: var(--ink); }
+.tooltip .lbl { color: var(--ink-2); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+td { padding: 6px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+td.num { font-weight: 600; }
+.offers-title { font-size: 13px; color: var(--ink-2); margin: 18px 0 6px; }
+.target-edit { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
+.target-edit input {
+  width: 110px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--page); color: var(--ink); font: inherit;
+}
+.target-edit button {
+  border: 1px solid var(--accent); color: var(--accent); background: none;
+  padding: 5px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.save-msg { color: var(--muted); font-size: 12px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--grid); padding-top: 14px; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>✈️ 機票價格雷達</h1>
+    <span class="sub" id="subline">台北出發 · 只看直飛 · 來回票 · 不含廉航</span>
+    <span class="updated" id="updated"></span>
+  </header>
+
+  <div class="controls" role="group" aria-label="國家篩選">
+    <button class="tab" data-tab="all" aria-pressed="true">全部</button>
+    <button class="tab" data-tab="japan" aria-pressed="false">日本</button>
+    <button class="tab" data-tab="italy" aria-pressed="false">義大利</button>
+    <button class="theme-btn" id="themeBtn" title="切換深/淺色">🌓 主題</button>
+  </div>
+
+  <div class="banner hidden" id="banner"></div>
+  <main id="main"></main>
+
+  <footer>
+    資料來源:Amadeus Flight Offers Search · 每日台灣時間 06:30 自動掃描 ·
+    顯示的是查詢當下的最低直飛來回報價,訂票前請以航空公司官網為準。
+  </footer>
+</div>
+
+<dialog id="detail">
+  <div class="d-head">
+    <h3 id="dTitle"></h3>
+    <span class="sub" id="dSub"></span>
+    <button class="d-close" id="dClose">關閉 ✕</button>
+  </div>
+  <div class="view-toggle" role="group" aria-label="檢視方式">
+    <button id="btnChart" aria-pressed="true">走勢圖</button>
+    <button id="btnTable" aria-pressed="false">表格</button>
+  </div>
+  <div class="chart-box" id="chartBox">
+    <div class="tooltip" id="tip"></div>
+  </div>
+  <div id="historyTable" class="hidden"></div>
+  <div class="offers-title" id="offersTitle"></div>
+  <div id="offersBox"></div>
+  <div class="target-edit">
+    <label for="targetInput">目標價 NT$</label>
+    <input id="targetInput" type="number" min="1000" step="100">
+    <button id="targetSave">儲存</button>
+    <span class="save-msg" id="saveMsg"></span>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const NT = (n) => "NT$" + Number(n).toLocaleString("zh-TW");
+const MD = (iso) => { const [ , m, d] = iso.split("-"); return Number(m) + "/" + Number(d); };
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+
+// ---- 主題切換(淺/深,預設跟系統) ----
+const savedTheme = localStorage.getItem("fpr-theme");
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$("themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("fpr-theme", next);
+  if (state.openCity) drawChart(state.openCity);
+  render();
+});
+
+// ---- 狀態 ----
+const state = { data: null, tab: "all", openCity: null, demo: false };
+
+// ---- 示範資料(API 還沒設定好、或網址加 ?demo=1 時使用) ----
+function demoData() {
+  const mk = (code, zh, en, base, n) => {
+    const history = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const wave = Math.sin((i + code.charCodeAt(0)) * 1.1) * base * 0.08;
+      history.push({
+        date: d.toISOString().slice(0, 10),
+        min: Math.round((base + wave + (i % 7) * base * 0.01) / 10) * 10,
+      });
+    }
+    const last = history[history.length - 1].min;
+    const offers = [0, 21, 42, 63, 84].map((off, j) => {
+      const dep = new Date(Date.now() + (14 + off) * 86400000);
+      const ret = new Date(dep.getTime() + 5 * 86400000);
+      return {
+        dep: dep.toISOString().slice(0, 10),
+        ret: ret.toISOString().slice(0, 10),
+        flights: "BR198 / BR197",
+        airlines: "長榮航空",
+        price: Math.round((last * (1 + j * 0.06)) / 10) * 10,
+      };
+    });
+    return {
+      code, zh, en, target: Math.round(base * 1.02 / 100) * 100,
+      latestScan: history[history.length - 1].date,
+      latestOffers: offers, history,
+    };
+  };
+  return {
+    updatedAt: new Date().toISOString().slice(0, 10),
+    origin: "台北(桃園/松山)",
+    countries: [
+      { key: "japan", name: "日本", tripDays: 5, cities: [
+        mk("TYO", "東京", "Tokyo", 8800, 30), mk("OSA", "大阪", "Osaka", 8200, 30),
+        mk("FUK", "福岡", "Fukuoka", 7900, 30), mk("SPK", "札幌", "Sapporo", 11200, 30),
+        { code: "AOJ", zh: "青森", en: "Aomori", target: 9000, latestScan: null, latestOffers: [], history: [] },
+      ]},
+      { key: "italy", name: "義大利", tripDays: 10, cities: [
+        mk("ROM", "羅馬", "Rome", 31500, 30), mk("MIL", "米蘭", "Milan", 29800, 30),
+      ]},
+    ],
+  };
+}
+
+// ---- 載入資料 ----
+async function load() {
+  if (new URLSearchParams(location.search).has("demo")) {
+    state.data = demoData(); state.demo = true;
+    showBanner("目前顯示示範資料(網址移除 ?demo=1 看真實資料)", false);
+    render(); return;
+  }
+  try {
+    const res = await fetch("/api/prices");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    state.data = data;
+    if (!data.updatedAt) {
+      showBanner("還沒有掃描資料——請先到 GitHub Actions 手動跑一次 daily-scan,或等明早 06:30 自動掃描。", false);
+    }
+    render();
+  } catch (err) {
+    state.data = demoData(); state.demo = true;
+    showBanner("讀取資料失敗(" + err.message + "),先顯示示範資料。請確認 Vercel 環境變數與 Sheet 設定。", true);
+    render();
+  }
+}
+
+function showBanner(msg, isError) {
+  const b = $("banner");
+  b.textContent = msg;
+  b.classList.toggle("error", !!isError);
+  b.classList.remove("hidden");
+}
+
+// ---- 畫面 ----
+const tabs = document.querySelectorAll(".tab");
+tabs.forEach((t) =>
+  t.addEventListener("click", () => {
+    state.tab = t.dataset.tab;
+    tabs.forEach((x) => x.setAttribute("aria-pressed", String(x === t)));
+    render();
+  })
+);
+
+function render() {
+  const main = $("main");
+  main.textContent = "";
+  if (!state.data) return;
+  $("updated").textContent = state.data.updatedAt
+    ? "最後掃描:" + state.data.updatedAt : "";
+  for (const country of state.data.countries) {
+    if (state.tab !== "all" && state.tab !== country.key) continue;
+    const sec = el("section");
+    const h2 = el("h2", null, country.name);
+    const withData = country.cities.filter((c) => c.history.length > 0).length;
+    h2.appendChild(el("span", "count",
+      country.cities.length + " 個直飛航點 · " + withData + " 個有報價 · " + country.tripDays + " 天行程"));
+    sec.appendChild(h2);
+    const grid = el("div", "grid");
+    for (const city of country.cities) grid.appendChild(cityCard(city));
+    sec.appendChild(grid);
+    main.appendChild(sec);
+  }
+}
+
+function cityCard(city) {
+  const card = el("button", "card");
+  const top = el("div", "top");
+  top.appendChild(el("span", "city", city.zh));
+  top.appendChild(el("span", "code", city.en + " " + city.code));
+  const best = city.latestOffers[0];
+  const isGood = best && best.price <= city.target;
+  if (isGood) top.appendChild(el("span", "chip", "▼ 低於目標價"));
+  card.appendChild(top);
+
+  const row = el("div", "price-row");
+  if (best) {
+    row.appendChild(el("span", "price", NT(best.price)));
+    row.appendChild(sparkline(city.history));
+  } else {
+    row.appendChild(el("span", "price na", "目前查無直飛報價"));
+  }
+  card.appendChild(row);
+
+  if (best) {
+    card.appendChild(el("div", "meta",
+      best.airlines + " " + best.flights + " · " + MD(best.dep) + " → " + MD(best.ret)));
+  }
+  card.appendChild(el("div", "target-line", "目標價 " + NT(city.target)));
+  card.addEventListener("click", () => openDetail(city));
+  return card;
+}
+
+function sparkline(history) {
+  const pts = history.slice(-14);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 120 36");
+  svg.setAttribute("width", "120"); svg.setAttribute("height", "36");
+  svg.classList.add("spark");
+  svg.setAttribute("aria-hidden", "true");
+  if (pts.length < 2) return svg;
+  const vals = pts.map((p) => p.min);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const y = (v) => hi === lo ? 18 : 30 - ((v - lo) / (hi - lo)) * 24;
+  const x = (i) => 4 + (i / (pts.length - 1)) * 108;
+  const line = document.createElementNS(svgNS, "polyline");
+  line.setAttribute("points", pts.map((p, i) => x(i) + "," + y(p.min)).join(" "));
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", css("--spark"));
+  line.setAttribute("stroke-width", "2");
+  line.setAttribute("stroke-linecap", "round");
+  line.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(line);
+  const dot = document.createElementNS(svgNS, "circle");
+  dot.setAttribute("cx", x(pts.length - 1));
+  dot.setAttribute("cy", y(vals[vals.length - 1]));
+  dot.setAttribute("r", "3");
+  dot.setAttribute("fill", css("--accent"));
+  dot.setAttribute("stroke", css("--surface"));
+  dot.setAttribute("stroke-width", "2");
+  svg.appendChild(dot);
+  return svg;
+}
+
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---- 明細 dialog ----
+$("dClose").addEventListener("click", () => $("detail").close());
+$("btnChart").addEventListener("click", () => setView(true));
+$("btnTable").addEventListener("click", () => setView(false));
+function setView(chart) {
+  $("btnChart").setAttribute("aria-pressed", String(chart));
+  $("btnTable").setAttribute("aria-pressed", String(!chart));
+  $("chartBox").classList.toggle("hidden", !chart);
+  $("historyTable").classList.toggle("hidden", chart);
+}
+
+function openDetail(city) {
+  state.openCity = city;
+  $("dTitle").textContent = city.zh + "(" + city.en + ")";
+  $("dSub").textContent = "每日最低直飛來回價";
+  drawChart(city);
+  drawHistoryTable(city);
+  drawOffers(city);
+  $("targetInput").value = city.target;
+  $("saveMsg").textContent = "";
+  setView(true);
+  $("detail").showModal();
+}
+
+function drawHistoryTable(city) {
+  const box = $("historyTable");
+  box.textContent = "";
+  const table = el("table");
+  const thead = el("thead"); const tr = el("tr");
+  ["掃描日", "當日最低價"].forEach((h) => tr.appendChild(el("th", null, h)));
+  thead.appendChild(tr); table.appendChild(thead);
+  const tbody = el("tbody");
+  for (const p of [...city.history].reverse()) {
+    const r = el("tr");
+    r.appendChild(el("td", null, p.date));
+    r.appendChild(el("td", "num", NT(p.min)));
+    tbody.appendChild(r);
+  }
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+function drawOffers(city) {
+  $("offersTitle").textContent = city.latestScan
+    ? "最新掃描(" + city.latestScan + ")各出發日最低價 — 看哪天出發最便宜"
+    : "尚無報價資料";
+  const box = $("offersBox");
+  box.textContent = "";
+  if (city.latestOffers.length === 0) return;
+  const table = el("table");
+  const thead = el("thead"); const tr = el("tr");
+  ["出發 → 回程", "航班", "航空公司", "價格"].forEach((h) => tr.appendChild(el("th", null, h)));
+  thead.appendChild(tr); table.appendChild(thead);
+  const tbody = el("tbody");
+  for (const o of city.latestOffers) {
+    const r = el("tr");
+    r.appendChild(el("td", null, MD(o.dep) + " → " + MD(o.ret)));
+    r.appendChild(el("td", null, o.flights));
+    r.appendChild(el("td", null, o.airlines));
+    const td = el("td", "num", NT(o.price));
+    if (o.price <= city.target) td.appendChild(el("span", "chip", " ▼ 好價"));
+    r.appendChild(td);
+    tbody.appendChild(r);
+  }
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+// ---- 走勢圖(單一序列折線 + 十字準線 tooltip) ----
+const CW = 660, CH = 280, PL = 62, PR = 18, PT = 16, PB = 34;
+
+function niceTicks(lo, hi) {
+  const span = hi - lo || 1;
+  const step0 = span / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= 5) || 10 * mag;
+  const start = Math.ceil(lo / step) * step;
+  const out = [];
+  for (let v = start; v <= hi + 1e-9; v += step) out.push(Math.round(v));
+  return out;
+}
+
+function drawChart(city) {
+  const box = $("chartBox");
+  [...box.querySelectorAll("svg")].forEach((s) => s.remove());
+  const tip = $("tip"); tip.style.display = "none";
+  const pts = city.history;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + CW + " " + CH);
+  svg.setAttribute("tabindex", "0");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", city.zh + " 每日最低價走勢,共 " + pts.length + " 天,可用左右鍵瀏覽數值");
+  box.appendChild(svg);
+  if (pts.length === 0) {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", CW / 2); t.setAttribute("y", CH / 2);
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("fill", css("--muted")); t.setAttribute("font-size", "14");
+    t.textContent = "尚無資料 — 等第一次掃描完成";
+    svg.appendChild(t);
+    return;
+  }
+  const vals = pts.map((p) => p.min);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = Math.max((hi - lo) * 0.12, hi * 0.02);
+  lo = Math.max(0, lo - pad); hi = hi + pad;
+  const X = (i) => pts.length === 1 ? (PL + CW - PR) / 2 : PL + (i / (pts.length - 1)) * (CW - PL - PR);
+  const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (CH - PT - PB);
+  const line = (x1, y1, x2, y2, stroke) => {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", x1); l.setAttribute("y1", y1);
+    l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+    l.setAttribute("stroke", stroke); l.setAttribute("stroke-width", "1");
+    return l;
+  };
+  const text = (x, y, str, anchor) => {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("fill", css("--muted")); t.setAttribute("font-size", "11");
+    if (anchor) t.setAttribute("text-anchor", anchor);
+    t.textContent = str;
+    return t;
+  };
+  // 格線 + Y 軸刻度
+  for (const v of niceTicks(lo, hi)) {
+    svg.appendChild(line(PL, Y(v), CW - PR, Y(v), css("--grid")));
+    svg.appendChild(text(PL - 8, Y(v) + 4, v.toLocaleString("zh-TW"), "end"));
+  }
+  svg.appendChild(line(PL, CH - PB, CW - PR, CH - PB, css("--baseline")));
+  // X 軸日期刻度(最多 5 個)
+  const stepX = Math.max(1, Math.ceil(pts.length / 5));
+  for (let i = 0; i < pts.length; i += stepX) {
+    svg.appendChild(text(X(i), CH - PB + 18, MD(pts[i].date), "middle"));
+  }
+  // 面積淡染 + 折線
+  if (pts.length > 1) {
+    const area = document.createElementNS(svgNS, "path");
+    area.setAttribute("d",
+      "M" + X(0) + "," + (CH - PB) + " " +
+      pts.map((p, i) => "L" + X(i) + "," + Y(p.min)).join(" ") +
+      " L" + X(pts.length - 1) + "," + (CH - PB) + " Z");
+    area.setAttribute("fill", css("--accent"));
+    area.setAttribute("opacity", "0.1");
+    svg.appendChild(area);
+    const pl = document.createElementNS(svgNS, "polyline");
+    pl.setAttribute("points", pts.map((p, i) => X(i) + "," + Y(p.min)).join(" "));
+    pl.setAttribute("fill", "none");
+    pl.setAttribute("stroke", css("--accent"));
+    pl.setAttribute("stroke-width", "2");
+    pl.setAttribute("stroke-linecap", "round");
+    pl.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(pl);
+  }
+  // 端點值直接標(只標最後一點)
+  const lastI = pts.length - 1;
+  const endDot = document.createElementNS(svgNS, "circle");
+  endDot.setAttribute("cx", X(lastI)); endDot.setAttribute("cy", Y(vals[lastI]));
+  endDot.setAttribute("r", "4.5");
+  endDot.setAttribute("fill", css("--accent"));
+  endDot.setAttribute("stroke", css("--surface"));
+  endDot.setAttribute("stroke-width", "2");
+  svg.appendChild(endDot);
+  const endLbl = document.createElementNS(svgNS, "text");
+  endLbl.setAttribute("x", Math.min(X(lastI), CW - PR - 4));
+  endLbl.setAttribute("y", Y(vals[lastI]) - 10);
+  endLbl.setAttribute("text-anchor", "end");
+  endLbl.setAttribute("fill", css("--ink"));
+  endLbl.setAttribute("font-size", "12");
+  endLbl.setAttribute("font-weight", "700");
+  endLbl.textContent = NT(vals[lastI]);
+  svg.appendChild(endLbl);
+
+  // 十字準線 + tooltip(hover 與鍵盤都可用)
+  const hair = line(0, PT, 0, CH - PB, css("--baseline"));
+  hair.style.display = "none";
+  svg.appendChild(hair);
+  const hdot = document.createElementNS(svgNS, "circle");
+  hdot.setAttribute("r", "4.5");
+  hdot.setAttribute("fill", css("--accent"));
+  hdot.setAttribute("stroke", css("--surface"));
+  hdot.setAttribute("stroke-width", "2");
+  hdot.style.display = "none";
+  svg.appendChild(hdot);
+
+  let focusIdx = -1;
+  const showAt = (i) => {
+    focusIdx = i;
+    const px = X(i), py = Y(pts[i].min);
+    hair.setAttribute("x1", px); hair.setAttribute("x2", px);
+    hair.style.display = "";
+    hdot.setAttribute("cx", px); hdot.setAttribute("cy", py);
+    hdot.style.display = "";
+    tip.textContent = "";
+    tip.appendChild(el("div", "val", NT(pts[i].min)));
+    tip.appendChild(el("div", "lbl", pts[i].date + " 當日最低"));
+    tip.style.display = "block";
+    const rect = box.getBoundingClientRect();
+    const sx = rect.width / CW;
+    let left = px * sx + 12;
+    if (left + 140 > rect.width) left = px * sx - 150;
+    tip.style.left = left + "px";
+    tip.style.top = Math.max(0, py * (rect.height / CH) - 48) + "px";
+  };
+  const hide = () => {
+    hair.style.display = "none"; hdot.style.display = "none";
+    tip.style.display = "none"; focusIdx = -1;
+  };
+  svg.addEventListener("pointermove", (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const mx = ((ev.clientX - rect.left) / rect.width) * CW;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const d = Math.abs(X(i) - mx);
+      if (d < bd) { bd = d; best = i; }
+    }
+    showAt(best);
+  });
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowRight") { showAt(Math.min(pts.length - 1, focusIdx < 0 ? lastI : focusIdx + 1)); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { showAt(Math.max(0, focusIdx < 0 ? lastI : focusIdx - 1)); ev.preventDefault(); }
+    if (ev.key === "Escape") hide();
+  });
+  svg.addEventListener("blur", hide);
+}
+
+// ---- 目標價儲存 ----
+$("targetSave").addEventListener("click", async () => {
+  const city = state.openCity;
+  if (!city) return;
+  const value = Number($("targetInput").value);
+  if (!Number.isFinite(value) || value < 1000) {
+    $("saveMsg").textContent = "請輸入合理的金額"; return;
+  }
+  if (state.demo) {
+    city.target = value;
+    $("saveMsg").textContent = "示範模式:僅本頁生效";
+    drawOffers(city); render(); return;
+  }
+  $("saveMsg").textContent = "儲存中…";
+  try {
+    const res = await fetch("/api/target", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: city.code, target: value }),
+    });
+    const out = await res.json();
+    if (!res.ok || out.error) throw new Error(out.error || "HTTP " + res.status);
+    city.target = value;
+    $("saveMsg").textContent = "已儲存 ✓";
+    drawOffers(city); render();
+  } catch (err) {
+    $("saveMsg").textContent = "儲存失敗:" + err.message;
+  }
+});
+
+load();
+</script>
+</body>
+</html>

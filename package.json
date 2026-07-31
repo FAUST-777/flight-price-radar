@@ -1,0 +1,12 @@
+{
+  "name": "flight-price-radar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scan": "node scripts/scan.mjs"
+  },
+  "dependencies": {
+    "googleapis": "^173.0.0"
+  }
+}
