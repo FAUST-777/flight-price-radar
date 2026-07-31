@@ -2,24 +2,13 @@
   "origin": "TPE",
   "originLabel": "台北(桃園/松山)",
   "currency": "TWD",
-  "airlineWhitelist": ["BR", "CI", "JL", "NH", "JX", "AE", "AZ", "7G"],
-  "airlineNames": {
-    "BR": "長榮航空",
-    "CI": "中華航空",
-    "JL": "日本航空",
-    "NH": "全日空",
-    "JX": "星宇航空",
-    "AE": "華信航空",
-    "AZ": "ITA義大利航空",
-    "7G": "星悅航空"
-  },
+  "airlineWhitelist": ["長榮航空", "中華航空", "星宇航空", "日本航空", "全日空", "ANA", "華信航空", "義大利航空", "ITA", "星悅航空"],
+  "airlineBlacklist": ["虎航", "樂桃", "捷星", "酷航", "亞洲航空", "香草", "ZIPAIR", "Zipair", "春秋", "濟州", "釜山航空", "德威", "易斯達", "泰獅", "越捷"],
   "scan": {
     "daysAheadStart": 14,
-    "daysAheadEnd": 110,
-    "sampleIntervalDays": 21,
-    "tierBPerDay": 3,
-    "maxOffersPerCall": 30,
-    "throttleMs": 350
+    "daysAheadEnd": 112,
+    "sampleIntervalDays": 14,
+    "throttleMs": 2500
   },
   "countries": [
     {
@@ -28,22 +17,22 @@
       "tripDays": 5,
       "defaultTargetTwd": 9000,
       "cities": [
-        { "code": "TYO", "zh": "東京", "en": "Tokyo", "tier": "A" },
-        { "code": "OSA", "zh": "大阪", "en": "Osaka", "tier": "A" },
-        { "code": "NGO", "zh": "名古屋", "en": "Nagoya", "tier": "A" },
-        { "code": "FUK", "zh": "福岡", "en": "Fukuoka", "tier": "A" },
-        { "code": "SPK", "zh": "札幌", "en": "Sapporo", "tier": "A" },
-        { "code": "OKA", "zh": "沖繩(那霸)", "en": "Okinawa", "tier": "A" },
-        { "code": "SDJ", "zh": "仙台", "en": "Sendai", "tier": "B" },
-        { "code": "KMJ", "zh": "熊本", "en": "Kumamoto", "tier": "B" },
-        { "code": "HIJ", "zh": "廣島", "en": "Hiroshima", "tier": "B" },
-        { "code": "TAK", "zh": "高松", "en": "Takamatsu", "tier": "B" },
-        { "code": "KOJ", "zh": "鹿兒島", "en": "Kagoshima", "tier": "B" },
-        { "code": "HKD", "zh": "函館", "en": "Hakodate", "tier": "B" },
-        { "code": "MYJ", "zh": "松山(愛媛)", "en": "Matsuyama", "tier": "B" },
-        { "code": "KMQ", "zh": "小松(金澤)", "en": "Komatsu", "tier": "B" },
-        { "code": "AOJ", "zh": "青森", "en": "Aomori", "tier": "B" },
-        { "code": "KKJ", "zh": "北九州", "en": "Kitakyushu", "tier": "B" }
+        { "code": "TYO", "zh": "東京", "en": "Tokyo" },
+        { "code": "OSA", "zh": "大阪", "en": "Osaka" },
+        { "code": "NGO", "zh": "名古屋", "en": "Nagoya" },
+        { "code": "FUK", "zh": "福岡", "en": "Fukuoka" },
+        { "code": "SPK", "zh": "札幌", "en": "Sapporo" },
+        { "code": "OKA", "zh": "沖繩(那霸)", "en": "Okinawa" },
+        { "code": "SDJ", "zh": "仙台", "en": "Sendai" },
+        { "code": "KMJ", "zh": "熊本", "en": "Kumamoto" },
+        { "code": "HIJ", "zh": "廣島", "en": "Hiroshima" },
+        { "code": "TAK", "zh": "高松", "en": "Takamatsu" },
+        { "code": "KOJ", "zh": "鹿兒島", "en": "Kagoshima" },
+        { "code": "HKD", "zh": "函館", "en": "Hakodate" },
+        { "code": "MYJ", "zh": "松山(愛媛)", "en": "Matsuyama" },
+        { "code": "KMQ", "zh": "小松(金澤)", "en": "Komatsu" },
+        { "code": "AOJ", "zh": "青森", "en": "Aomori" },
+        { "code": "KKJ", "zh": "北九州", "en": "Kitakyushu" }
       ]
     },
     {
@@ -52,8 +41,8 @@
       "tripDays": 10,
       "defaultTargetTwd": 32000,
       "cities": [
-        { "code": "ROM", "zh": "羅馬", "en": "Rome", "tier": "A" },
-        { "code": "MIL", "zh": "米蘭", "en": "Milan", "tier": "A" }
+        { "code": "FCO", "zh": "羅馬", "en": "Rome" },
+        { "code": "MXP", "zh": "米蘭", "en": "Milan" }
       ]
     }
   ]

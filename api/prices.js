@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: "v4", auth });
     const result = await sheets.spreadsheets.values.batchGet({
       spreadsheetId: process.env.SHEET_ID,
-      ranges: ["prices!A2:J", "targets!A2:C"],
+      ranges: ["prices!A2:I", "targets!A2:C"],
     });
     const priceRows = result.data.valueRanges[0].values || [];
     const targetRows = result.data.valueRanges[1].values || [];
@@ -22,13 +22,13 @@ export default async function handler(req, res) {
     const targets = {};
     for (const r of targetRows) targets[r[0]] = Number(r[2]) || null;
 
-    // rows: 掃描日,國家,城市,代碼,出發日,回程日,航班,航空公司,價格,報價數
+    // rows: 掃描日,國家,城市,代碼,出發日,回程日,航空公司,價格,直達班次數
     const byCity = {};
     for (const r of priceRows) {
-      const [scanDate, , , code, dep, ret, flights, airlines, price] = r;
+      const [scanDate, , , code, dep, ret, airlines, price] = r;
       if (!code || !price) continue;
       (byCity[code] ||= []).push({
-        scanDate, dep, ret, flights, airlines, price: Number(price),
+        scanDate, dep, ret, airlines, price: Number(price),
       });
     }
 
@@ -55,9 +55,7 @@ export default async function handler(req, res) {
         const latestOffers = rows
           .filter((r) => r.scanDate === latestScan)
           .sort((a, b) => a.price - b.price)
-          .map(({ dep, ret, flights, airlines, price }) => ({
-            dep, ret, flights, airlines, price,
-          }));
+          .map(({ dep, ret, airlines, price }) => ({ dep, ret, airlines, price }));
         return {
           code: c.code,
           zh: c.zh,

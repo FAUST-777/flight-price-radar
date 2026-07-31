@@ -178,7 +178,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
   <main id="main"></main>
 
   <footer>
-    資料來源:Amadeus Flight Offers Search · 每日台灣時間 06:30 自動掃描 ·
+    資料來源:Google 航班 · 每日台灣時間 06:30 自動掃描 ·
     顯示的是查詢當下的最低直飛來回報價,訂票前請以航空公司官網為準。
   </footer>
 </div>
@@ -219,9 +219,9 @@ const el = (tag, cls, text) => {
   return e;
 };
 
-// ---- 主題切換(淺/深,預設跟系統) ----
+// ---- 主題切換(預設黑暗風格,可切淺色) ----
 const savedTheme = localStorage.getItem("fpr-theme");
-if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+document.documentElement.dataset.theme = savedTheme || "dark";
 $("themeBtn").addEventListener("click", () => {
   const cur = document.documentElement.dataset.theme ||
     (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -254,7 +254,6 @@ function demoData() {
       return {
         dep: dep.toISOString().slice(0, 10),
         ret: ret.toISOString().slice(0, 10),
-        flights: "BR198 / BR197",
         airlines: "長榮航空",
         price: Math.round((last * (1 + j * 0.06)) / 10) * 10,
       };
@@ -275,7 +274,7 @@ function demoData() {
         { code: "AOJ", zh: "青森", en: "Aomori", target: 9000, latestScan: null, latestOffers: [], history: [] },
       ]},
       { key: "italy", name: "義大利", tripDays: 10, cities: [
-        mk("ROM", "羅馬", "Rome", 31500, 30), mk("MIL", "米蘭", "Milan", 29800, 30),
+        mk("FCO", "羅馬", "Rome", 31500, 30), mk("MXP", "米蘭", "Milan", 29800, 30),
       ]},
     ],
   };
@@ -364,7 +363,7 @@ function cityCard(city) {
 
   if (best) {
     card.appendChild(el("div", "meta",
-      best.airlines + " " + best.flights + " · " + MD(best.dep) + " → " + MD(best.ret)));
+      best.airlines + " · " + MD(best.dep) + " → " + MD(best.ret)));
   }
   card.appendChild(el("div", "target-line", "目標價 " + NT(city.target)));
   card.addEventListener("click", () => openDetail(city));
@@ -456,13 +455,12 @@ function drawOffers(city) {
   if (city.latestOffers.length === 0) return;
   const table = el("table");
   const thead = el("thead"); const tr = el("tr");
-  ["出發 → 回程", "航班", "航空公司", "價格"].forEach((h) => tr.appendChild(el("th", null, h)));
+  ["出發 → 回程", "航空公司", "價格"].forEach((h) => tr.appendChild(el("th", null, h)));
   thead.appendChild(tr); table.appendChild(thead);
   const tbody = el("tbody");
   for (const o of city.latestOffers) {
     const r = el("tr");
     r.appendChild(el("td", null, MD(o.dep) + " → " + MD(o.ret)));
-    r.appendChild(el("td", null, o.flights));
     r.appendChild(el("td", null, o.airlines));
     const td = el("td", "num", NT(o.price));
     if (o.price <= city.target) td.appendChild(el("span", "chip", " ▼ 好價"));

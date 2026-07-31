@@ -1,5 +1,33 @@
 # DEVELOPMENT_LOG
 
+## 2026-07-31(稍晚)資料來源改為 Google 航班 + 介面預設黑暗風格
+
+使用者回報 developers.amadeus.com 無法註冊。實際到網站查證:
+**Amadeus for Developers 自助服務(Self-Service)已於 2026-07-17 正式下線**,
+網站現在只服務企業簽約版(Enterprise API Portal)——原本的免費 API 方案整個不存在了。
+
+使用者指示改查 Skyscanner 與 Google 航班,實測結果:
+
+| 來源 | 結果 |
+|---|---|
+| Skyscanner | 無公開 API;搜尋頁 `HTTP 307` 轉驗證頁擋爬蟲 → 不可用 |
+| Google 航班 | `?q=TPE to NRT round trip <日期> through <日期> nonstop&hl=zh-TW&curr=TWD` 純 HTTP 抓取即回完整結果(2.4MB HTML),台幣計價、「直達」條件自動套用 → **採用** |
+
+解析方式:以 `class="pIav2d"` 切航班列;價格取 `aria-label="NNNN 新台幣"`;
+必須含「直達」字樣;先比對廉航黑名單(擋掉日航掛名捷星代飛這種),再比對全服務白名單。
+實測 TPE→NRT(42 列)、TPE→MXP(長榮 $49,943)、TPE→TAK(華航/日航 $15,807)皆解析成功;
+TPE→FCO 特定日期 0 筆屬正常(該日無直飛,多日期取樣會涵蓋)。
+
+連帶變更:
+- **不再需要任何 API 金鑰**,GitHub Secrets 只剩 `GOOGLE_SERVICE_ACCOUNT` 與 `SHEET_ID`
+- 沒了 API 額度限制:16+2 個城市全部每天掃,取樣加密為每 14 天一組(原每 21 天+Tier B 輪掃)
+- 城市代碼義大利改用機場碼 FCO/MXP(Google 航班對城市碼 ROM/MIL 的解析不如機場碼精準)
+- prices 分頁欄位:移除「航班號」(Google 航班列表頁沒有穩定的班號欄位),保留航空公司名稱
+- 依使用者要求,網頁**預設黑暗風格**(仍可切換淺色)
+- 風險與備案寫入 README:Actions 機房 IP 被限制時的偵測(同意頁/幣別檢查)與本機執行備案
+
+## 2026-07-31 專案建立
+
 ## 2026-07-31 專案建立
 
 ### 對話過程
