@@ -5,52 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>機票價格雷達 Flight Price Radar</title>
 <style>
-:root {
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:      #0a0a0a;
+  --surface:   #151614;
+  --surface-2: #1c1e1b;
+  --ink:       #f2f4f0;
+  --ink-2:     #b8bdb4;
+  --muted:     #7d827a;
+  --grid:      #262924;
+  --baseline:  #3a3e38;
+  --border:    rgba(52,211,153,0.28);
+  --border-dim:rgba(255,255,255,0.09);
+  --green:     #00a86b;   /* 圖表線條(通過深色驗證) */
+  --green-ui:  #34d399;   /* 介面點綴文字/外框 */
+  --green-bg:  rgba(0,168,107,0.12);
+  --critical:  #e05252;
+  --critical-bg: rgba(224,82,82,0.14);
+}
+:root[data-theme="light"] {
   color-scheme: light;
   --page:      #f9f9f7;
   --surface:   #fcfcfb;
+  --surface-2: #f1f2ef;
   --ink:       #0b0b0b;
   --ink-2:     #52514e;
   --muted:     #898781;
   --grid:      #e1e0d9;
   --baseline:  #c3c2b7;
-  --border:    rgba(11,11,11,0.10);
-  --accent:    #2a78d6;
-  --spark:     #86b6ef;
+  --border:    rgba(0,131,0,0.35);
+  --border-dim:rgba(11,11,11,0.10);
+  --green:     #008300;
+  --green-ui:  #0b6b39;
+  --green-bg:  rgba(0,131,0,0.08);
   --critical:  #d03b3b;
   --critical-bg: rgba(208,59,59,0.10);
-}
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --page:      #0d0d0d;
-    --surface:   #1a1a19;
-    --ink:       #ffffff;
-    --ink-2:     #c3c2b7;
-    --muted:     #898781;
-    --grid:      #2c2c2a;
-    --baseline:  #383835;
-    --border:    rgba(255,255,255,0.10);
-    --accent:    #3987e5;
-    --spark:     #5598e7;
-    --critical:  #d03b3b;
-    --critical-bg: rgba(208,59,59,0.18);
-  }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --page:      #0d0d0d;
-  --surface:   #1a1a19;
-  --ink:       #ffffff;
-  --ink-2:     #c3c2b7;
-  --muted:     #898781;
-  --grid:      #2c2c2a;
-  --baseline:  #383835;
-  --border:    rgba(255,255,255,0.10);
-  --accent:    #3987e5;
-  --spark:     #5598e7;
-  --critical:  #d03b3b;
-  --critical-bg: rgba(208,59,59,0.18);
 }
 * { box-sizing: border-box; }
 body {
@@ -60,83 +49,129 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
   line-height: 1.5;
 }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 56px; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 20px 16px 56px; }
 header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 h1 { font-size: 22px; margin: 0; }
 .sub { color: var(--ink-2); font-size: 13px; }
 .updated { color: var(--muted); font-size: 12px; margin-left: auto; }
-
-.controls {
-  display: flex; align-items: center; gap: 8px;
-  margin: 16px 0 20px; flex-wrap: wrap;
-}
-.tab {
-  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
-  padding: 6px 16px; border-radius: 999px; font-size: 14px; cursor: pointer;
-}
-.tab[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); font-weight: 600; }
 .theme-btn {
-  margin-left: auto; border: 1px solid var(--border); background: var(--surface);
-  color: var(--ink-2); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--border-dim); background: var(--surface);
+  color: var(--ink-2); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; cursor: pointer;
 }
 
 .banner {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  padding: 10px 14px; font-size: 13px; color: var(--ink-2); margin-bottom: 16px;
+  background: var(--surface); border: 1px solid var(--border-dim); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; color: var(--ink-2); margin: 14px 0 0;
 }
 .banner.error { border-color: var(--critical); }
 
-section h2 { font-size: 17px; margin: 26px 0 12px; }
-section h2 .count { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
-.grid {
-  display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+/* ---- 篩選面板 ---- */
+.panel {
+  background: var(--surface); border: 1px solid var(--border-dim); border-radius: 14px;
+  padding: 14px 16px; margin-top: 14px;
 }
-.card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  padding: 14px 16px 12px; cursor: pointer; text-align: left; font: inherit; color: inherit;
-  display: flex; flex-direction: column; gap: 6px; min-height: 148px;
+.panel .row-label {
+  display: inline-block; border: 1px solid var(--border); color: var(--green-ui);
+  border-radius: 10px; padding: 5px 16px; font-size: 14px; font-weight: 600;
+  background: none; cursor: default;
 }
-.card:hover { border-color: var(--accent); }
-.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.card .top { display: flex; align-items: center; gap: 8px; }
-.card .city { font-weight: 700; font-size: 15px; }
-.card .code { color: var(--muted); font-size: 12px; }
-.chip {
-  margin-left: auto; color: var(--critical); background: var(--critical-bg);
-  font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+.chips { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.chip-btn {
+  border: 1px solid var(--border-dim); background: var(--surface-2); color: var(--ink-2);
+  border-radius: 10px; padding: 6px 22px; font-size: 15px; cursor: pointer; font-family: inherit;
 }
-.price-row { display: flex; align-items: flex-end; gap: 10px; }
-.price { font-size: 26px; font-weight: 600; }
-.price.na { color: var(--muted); font-weight: 400; font-size: 15px; }
-.spark { margin-left: auto; flex: none; }
-.meta { color: var(--ink-2); font-size: 12.5px; }
-.target-line { color: var(--muted); font-size: 12px; }
+.chip-btn[aria-pressed="true"] {
+  border-color: var(--border); color: var(--green-ui); background: var(--green-bg); font-weight: 700;
+}
+.dates { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+.dates .pair { display: flex; align-items: center; gap: 10px; }
+.dates input[type="date"] {
+  background: var(--surface-2); border: 1px solid var(--border-dim); color: var(--ink);
+  border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 14px;
+}
+.hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.hint.warn { color: var(--critical); }
+.hint .link { color: var(--green-ui); cursor: pointer; text-decoration: underline; background: none; border: none; font: inherit; padding: 0; }
 
+.city-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.city-col { border: 1px solid var(--border-dim); border-radius: 12px; padding: 12px 14px; }
+.city-col .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.city-col .mini {
+  background: none; border: none; color: var(--green-ui); font-size: 12px; cursor: pointer;
+  text-decoration: underline; padding: 0; font-family: inherit;
+}
+.country-group { margin-top: 6px; }
+.country-group .g-name { color: var(--muted); font-size: 12px; margin: 6px 0 2px; }
+.city-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 2px 10px; }
+.city-list label {
+  display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2);
+  padding: 2px 0; cursor: pointer; white-space: nowrap;
+}
+.city-list input[type="checkbox"] { accent-color: var(--green); width: 15px; height: 15px; }
+.city-list label.off { color: var(--muted); cursor: not-allowed; }
+.mirror-note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* ---- 結果橫條 ---- */
+.results { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.result-head { color: var(--muted); font-size: 12.5px; margin-top: 20px; }
+.bar {
+  display: grid; grid-template-columns: 1.15fr 0.9fr 0.9fr 1.1fr; gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border-dim); border-radius: 14px;
+  padding: 14px 18px; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%;
+}
+.bar:hover { border-color: var(--border); }
+.bar:focus-visible { outline: 2px solid var(--green-ui); outline-offset: 2px; }
+.bar .route { font-size: 15.5px; font-weight: 700; }
+.bar .airline { color: var(--ink-2); font-size: 13px; }
+.bar .dates-txt { color: var(--ink-2); font-size: 13px; }
+.bar .lbl { color: var(--muted); font-size: 12px; }
+.bar .val { font-size: 17px; font-weight: 600; margin-top: 2px; }
+.bar .val.now { font-size: 20px; }
+.chip {
+  display: inline-block; color: var(--critical); background: var(--critical-bg);
+  font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: 6px;
+  white-space: nowrap;
+}
+.bar .target-line { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.bar .trend-lbl { color: var(--green-ui); font-size: 12px; margin-bottom: 2px; }
+.bar .spark-cell { justify-self: end; text-align: right; min-width: 0; }
+.empty {
+  border: 1px dashed var(--border-dim); border-radius: 14px; padding: 28px 16px; text-align: center;
+  color: var(--muted); font-size: 14px; margin-top: 18px;
+}
+.no-data-note { color: var(--muted); font-size: 12.5px; margin-top: 14px; }
+
+@media (max-width: 640px) {
+  .city-cols { grid-template-columns: 1fr; }
+  .bar { grid-template-columns: 1fr 1fr; }
+  .bar .spark-cell { justify-self: start; text-align: left; grid-column: 2; }
+}
+
+/* ---- 明細 dialog ---- */
 dialog {
-  border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border-dim); border-radius: 14px; background: var(--surface); color: var(--ink);
   width: min(720px, calc(100vw - 32px)); padding: 20px;
 }
-dialog::backdrop { background: rgba(0,0,0,0.45); }
+dialog::backdrop { background: rgba(0,0,0,0.55); }
 .d-head { display: flex; align-items: baseline; gap: 10px; }
 .d-head h3 { margin: 0; font-size: 18px; }
 .d-close {
-  margin-left: auto; border: 1px solid var(--border); background: none; color: var(--ink-2);
+  margin-left: auto; border: 1px solid var(--border-dim); background: none; color: var(--ink-2);
   border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 14px;
 }
 .view-toggle { display: flex; gap: 6px; margin: 14px 0 6px; }
 .view-toggle button {
-  border: 1px solid var(--border); background: none; color: var(--ink-2);
-  padding: 3px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer;
+  border: 1px solid var(--border-dim); background: none; color: var(--ink-2);
+  padding: 3px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer; font-family: inherit;
 }
-.view-toggle button[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); }
+.view-toggle button[aria-pressed="true"] { color: var(--green-ui); border-color: var(--border); }
 .chart-box { position: relative; }
 .chart-box svg { display: block; width: 100%; height: auto; }
-.chart-box svg:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
+.chart-box svg:focus-visible { outline: 2px solid var(--green-ui); border-radius: 8px; }
 .tooltip {
-  position: absolute; pointer-events: none; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.18); font-size: 12px; display: none; z-index: 5;
+  position: absolute; pointer-events: none; background: var(--surface-2);
+  border: 1px solid var(--border-dim); border-radius: 8px; padding: 6px 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35); font-size: 12px; display: none; z-index: 5;
 }
 .tooltip .val { font-size: 14px; font-weight: 700; color: var(--ink); }
 .tooltip .lbl { color: var(--ink-2); }
@@ -147,12 +182,12 @@ td.num { font-weight: 600; }
 .offers-title { font-size: 13px; color: var(--ink-2); margin: 18px 0 6px; }
 .target-edit { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
 .target-edit input {
-  width: 110px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px;
+  width: 110px; padding: 5px 8px; border: 1px solid var(--border-dim); border-radius: 8px;
   background: var(--page); color: var(--ink); font: inherit;
 }
 .target-edit button {
-  border: 1px solid var(--accent); color: var(--accent); background: none;
-  padding: 5px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  border: 1px solid var(--border); color: var(--green-ui); background: none;
+  padding: 5px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-family: inherit;
 }
 .save-msg { color: var(--muted); font-size: 12px; }
 footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--grid); padding-top: 14px; }
@@ -163,19 +198,57 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
 <div class="wrap">
   <header>
     <h1>✈️ 機票價格雷達</h1>
-    <span class="sub" id="subline">台北出發 · 只看直飛 · 來回票 · 不含廉航</span>
+    <span class="sub">台北出發 · 只看直飛 · 來回票 · 不含廉航</span>
     <span class="updated" id="updated"></span>
+    <button class="theme-btn" id="themeBtn" title="切換深/淺色">🌓</button>
   </header>
 
-  <div class="controls" role="group" aria-label="國家篩選">
-    <button class="tab" data-tab="all" aria-pressed="true">全部</button>
-    <button class="tab" data-tab="japan" aria-pressed="false">日本</button>
-    <button class="tab" data-tab="italy" aria-pressed="false">義大利</button>
-    <button class="theme-btn" id="themeBtn" title="切換深/淺色">🌓 主題</button>
+  <div class="banner hidden" id="banner"></div>
+
+  <!-- 篩選一:國家 -->
+  <div class="panel">
+    <div class="chips" id="countryChips"></div>
+    <div class="hint hidden" id="countryHint"></div>
   </div>
 
-  <div class="banner hidden" id="banner"></div>
-  <main id="main"></main>
+  <!-- 篩選二:日期 -->
+  <div class="panel">
+    <div class="dates">
+      <div class="pair">
+        <span class="row-label">去程日期</span>
+        <input type="date" id="depDate" aria-label="去程日期(此日以後出發)">
+      </div>
+      <div class="pair">
+        <span class="row-label">回程日期</span>
+        <input type="date" id="retDate" aria-label="回程日期(此日以前回來)">
+      </div>
+    </div>
+    <div class="hint" id="dateHint"></div>
+  </div>
+
+  <!-- 篩選三:去程/回程城市 -->
+  <div class="panel">
+    <div class="city-cols">
+      <div class="city-col">
+        <div class="head">
+          <span class="row-label">去程</span>
+          <button class="mini" id="cityAll">全選</button>
+          <button class="mini" id="cityNone">全不選</button>
+        </div>
+        <div id="depCities"></div>
+        <div class="hint warn hidden" id="cityHint">至少勾選一個城市才有結果</div>
+      </div>
+      <div class="city-col">
+        <div class="head"><span class="row-label">回程</span></div>
+        <div id="retCities"></div>
+        <div class="mirror-note">🔒 來回票同進同出:回程城市自動跟隨去程,不用選</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-head" id="resultHead"></div>
+  <div class="results" id="results"></div>
+  <div class="no-data-note hidden" id="noDataNote"></div>
 
   <footer>
     資料來源:Google 航班 · 每日台灣時間 06:30 自動掃描 ·
@@ -211,31 +284,34 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
 "use strict";
 const $ = (id) => document.getElementById(id);
 const NT = (n) => "NT$" + Number(n).toLocaleString("zh-TW");
-const MD = (iso) => { const [ , m, d] = iso.split("-"); return Number(m) + "/" + Number(d); };
+const MD = (iso) => { const [, m, d] = iso.split("-"); return Number(m) + "/" + Number(d); };
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
 };
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-// ---- 主題切換(預設黑暗風格,可切淺色) ----
-const savedTheme = localStorage.getItem("fpr-theme");
-document.documentElement.dataset.theme = savedTheme || "dark";
+// ---- 主題(預設黑暗風格) ----
+document.documentElement.dataset.theme = localStorage.getItem("fpr-theme") || "dark";
 $("themeBtn").addEventListener("click", () => {
-  const cur = document.documentElement.dataset.theme ||
-    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  const next = cur === "dark" ? "light" : "dark";
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
   localStorage.setItem("fpr-theme", next);
-  if (state.openCity) drawChart(state.openCity);
   render();
+  if (state.openCity) drawChart(state.openCity);
 });
 
 // ---- 狀態 ----
-const state = { data: null, tab: "all", openCity: null, demo: false };
+const state = {
+  data: null, demo: false, openCity: null,
+  countries: new Set(),      // 啟用的國家 key
+  cities: new Set(),         // 勾選的城市代碼
+  dep: "", ret: "",          // 日期篩選(去程不早於 dep,回程不晚於 ret)
+};
 
-// ---- 示範資料(API 還沒設定好、或網址加 ?demo=1 時使用) ----
+// ---- 示範資料 ----
 function demoData() {
   const mk = (code, zh, en, base, n) => {
     const history = [];
@@ -254,7 +330,7 @@ function demoData() {
       return {
         dep: dep.toISOString().slice(0, 10),
         ret: ret.toISOString().slice(0, 10),
-        airlines: "長榮航空",
+        airlines: ["長榮航空", "中華航空", "星宇航空"][j % 3],
         price: Math.round((last * (1 + j * 0.06)) / 10) * 10,
       };
     });
@@ -280,28 +356,32 @@ function demoData() {
   };
 }
 
-// ---- 載入資料 ----
+// ---- 載入 ----
 async function load() {
   if (new URLSearchParams(location.search).has("demo")) {
     state.data = demoData(); state.demo = true;
     showBanner("目前顯示示範資料(網址移除 ?demo=1 看真實資料)", false);
-    render(); return;
-  }
-  try {
-    const res = await fetch("/api/prices");
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    state.data = data;
-    if (!data.updatedAt) {
-      showBanner("還沒有掃描資料——請先到 GitHub Actions 手動跑一次 daily-scan,或等明早 06:30 自動掃描。", false);
+  } else {
+    try {
+      const res = await fetch("/api/prices");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      state.data = data;
+      if (!data.updatedAt) {
+        showBanner("還沒有掃描資料——請先到 GitHub Actions 手動跑一次 daily-scan,或等明早 06:30 自動掃描。", false);
+      }
+    } catch (err) {
+      state.data = demoData(); state.demo = true;
+      showBanner("讀取資料失敗(" + err.message + "),先顯示示範資料。請確認 Vercel 環境變數與 Sheet 設定。", true);
     }
-    render();
-  } catch (err) {
-    state.data = demoData(); state.demo = true;
-    showBanner("讀取資料失敗(" + err.message + "),先顯示示範資料。請確認 Vercel 環境變數與 Sheet 設定。", true);
-    render();
   }
+  for (const c of state.data.countries) {
+    state.countries.add(c.key);
+    for (const city of c.cities) state.cities.add(city.code);
+  }
+  buildFilters();
+  render();
 }
 
 function showBanner(msg, isError) {
@@ -311,82 +391,256 @@ function showBanner(msg, isError) {
   b.classList.remove("hidden");
 }
 
-// ---- 畫面 ----
-const tabs = document.querySelectorAll(".tab");
-tabs.forEach((t) =>
-  t.addEventListener("click", () => {
-    state.tab = t.dataset.tab;
-    tabs.forEach((x) => x.setAttribute("aria-pressed", String(x === t)));
-    render();
-  })
-);
+function flash(id, msg) {
+  const h = $(id);
+  h.textContent = msg;
+  h.classList.remove("hidden");
+  clearTimeout(h._t);
+  h._t = setTimeout(() => h.classList.add("hidden"), 4000);
+}
 
-function render() {
-  const main = $("main");
-  main.textContent = "";
-  if (!state.data) return;
-  $("updated").textContent = state.data.updatedAt
-    ? "最後掃描:" + state.data.updatedAt : "";
-  for (const country of state.data.countries) {
-    if (state.tab !== "all" && state.tab !== country.key) continue;
-    const sec = el("section");
-    const h2 = el("h2", null, country.name);
-    const withData = country.cities.filter((c) => c.history.length > 0).length;
-    h2.appendChild(el("span", "count",
-      country.cities.length + " 個直飛航點 · " + withData + " 個有報價 · " + country.tripDays + " 天行程"));
-    sec.appendChild(h2);
-    const grid = el("div", "grid");
-    for (const city of country.cities) grid.appendChild(cityCard(city));
-    sec.appendChild(grid);
-    main.appendChild(sec);
+// ---- 資料涵蓋範圍(給日期防呆用) ----
+function dataRange() {
+  let lo = null, hi = null;
+  for (const c of state.data.countries) {
+    for (const city of c.cities) {
+      for (const o of city.latestOffers) {
+        if (!lo || o.dep < lo) lo = o.dep;
+        if (!hi || o.ret > hi) hi = o.ret;
+      }
+    }
+  }
+  return { lo, hi };
+}
+
+// ---- 篩選面板 ----
+function buildFilters() {
+  // 國家 chips
+  const chips = $("countryChips");
+  chips.textContent = "";
+  for (const c of state.data.countries) {
+    const b = el("button", "chip-btn", c.name);
+    b.setAttribute("aria-pressed", String(state.countries.has(c.key)));
+    b.addEventListener("click", () => {
+      if (state.countries.has(c.key)) {
+        if (state.countries.size === 1) {
+          flash("countryHint", "防呆:至少要保留一個國家");
+          return;
+        }
+        state.countries.delete(c.key);
+      } else {
+        state.countries.add(c.key);
+        // 重新加入國家時,該國城市預設全勾(避免看起來「開了卻沒東西」)
+        for (const city of c.cities) state.cities.add(city.code);
+      }
+      buildFilters(); render();
+    });
+    chips.appendChild(b);
+  }
+
+  // 日期
+  const { lo, hi } = dataRange();
+  const dh = $("dateHint");
+  dh.textContent = lo
+    ? "留空=不限。目前資料涵蓋出發 " + lo + " ~ 回程 " + hi + "(每天掃描的取樣日)"
+    : "尚無報價資料";
+  const dep = $("depDate"), ret = $("retDate");
+  dep.value = state.dep; ret.value = state.ret;
+  if (lo) { dep.min = lo; dep.max = hi; ret.min = state.dep || lo; ret.max = hi; }
+
+  // 城市(去程可勾,回程鎖定跟隨)
+  const depBox = $("depCities"), retBox = $("retCities");
+  depBox.textContent = ""; retBox.textContent = "";
+  for (const c of state.data.countries) {
+    if (!state.countries.has(c.key)) continue;
+    for (const [box, mirror] of [[depBox, false], [retBox, true]]) {
+      const g = el("div", "country-group");
+      g.appendChild(el("div", "g-name", c.name + "(" + c.tripDays + " 天行程)"));
+      const list = el("div", "city-list");
+      for (const city of c.cities) {
+        const lab = el("label", mirror ? "off" : null);
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = state.cities.has(city.code);
+        cb.disabled = mirror;
+        if (mirror) {
+          cb.dataset.mirror = city.code;
+          cb.title = "回程城市自動跟隨去程";
+        } else {
+          cb.addEventListener("change", () => {
+            if (cb.checked) state.cities.add(city.code);
+            else state.cities.delete(city.code);
+            const m = retBox.querySelector('input[data-mirror="' + city.code + '"]');
+            if (m) m.checked = cb.checked;
+            render();
+          });
+        }
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(city.zh));
+        list.appendChild(lab);
+      }
+      g.appendChild(list);
+      box.appendChild(g);
+    }
   }
 }
 
-function cityCard(city) {
-  const card = el("button", "card");
-  const top = el("div", "top");
-  top.appendChild(el("span", "city", city.zh));
-  top.appendChild(el("span", "code", city.en + " " + city.code));
-  const best = city.latestOffers[0];
-  const isGood = best && best.price <= city.target;
-  if (isGood) top.appendChild(el("span", "chip", "▼ 低於目標價"));
-  card.appendChild(top);
+// 日期防呆:回程不可早於去程
+$("depDate").addEventListener("change", () => {
+  state.dep = $("depDate").value;
+  if (state.dep && state.ret && state.ret < state.dep) {
+    state.ret = "";
+    $("retDate").value = "";
+    flash("dateHint", "防呆:回程日期不可早於去程,已幫你清空回程日期");
+  }
+  $("retDate").min = state.dep || "";
+  render();
+});
+$("retDate").addEventListener("change", () => {
+  const v = $("retDate").value;
+  if (v && state.dep && v < state.dep) {
+    $("retDate").value = "";
+    flash("dateHint", "防呆:回程日期不可早於去程(" + state.dep + ")");
+    return;
+  }
+  state.ret = v;
+  render();
+});
+$("cityAll").addEventListener("click", () => {
+  for (const c of state.data.countries) {
+    if (!state.countries.has(c.key)) continue;
+    for (const city of c.cities) state.cities.add(city.code);
+  }
+  buildFilters(); render();
+});
+$("cityNone").addEventListener("click", () => {
+  state.cities.clear();
+  buildFilters(); render();
+});
 
-  const row = el("div", "price-row");
-  if (best) {
-    row.appendChild(el("span", "price", NT(best.price)));
-    row.appendChild(sparkline(city.history));
+function clearFilters() {
+  state.dep = ""; state.ret = "";
+  for (const c of state.data.countries) {
+    state.countries.add(c.key);
+    for (const city of c.cities) state.cities.add(city.code);
+  }
+  buildFilters(); render();
+}
+
+// ---- 結果 ----
+function matchedOffers(city) {
+  return city.latestOffers.filter((o) =>
+    (!state.dep || o.dep >= state.dep) && (!state.ret || o.ret <= state.ret)
+  );
+}
+
+function render() {
+  $("updated").textContent = state.data && state.data.updatedAt ? "最後掃描:" + state.data.updatedAt : "";
+  const box = $("results");
+  box.textContent = "";
+  if (!state.data) return;
+
+  const rows = [];
+  const noData = [];
+  for (const c of state.data.countries) {
+    if (!state.countries.has(c.key)) continue;
+    for (const city of c.cities) {
+      if (!state.cities.has(city.code)) continue;
+      const offers = matchedOffers(city);
+      if (offers.length === 0) { noData.push(city.zh); continue; }
+      rows.push({ city, country: c, best: offers[0] });
+    }
+  }
+  rows.sort((a, b) => a.best.price - b.best.price);
+
+  const anyChecked = [...state.data.countries].some((c) =>
+    state.countries.has(c.key) && c.cities.some((x) => state.cities.has(x.code)));
+  $("cityHint").classList.toggle("hidden", anyChecked);
+
+  $("resultHead").textContent = rows.length
+    ? rows.length + " 條航線符合條件,依目前價格由低到高排列"
+    : "";
+
+  if (rows.length === 0) {
+    const e = el("div", "empty");
+    e.appendChild(el("div", null, anyChecked
+      ? "沒有符合篩選條件的航線(可能日期範圍太窄,掃描取樣日見上方提示)"
+      : "還沒勾選任何城市"));
+    const btn = el("button", "link", "清除全部篩選");
+    btn.style.cssText = "margin-top:10px;background:none;border:1px solid var(--border);color:var(--green-ui);border-radius:8px;padding:6px 16px;cursor:pointer;font:inherit;font-size:13px;";
+    btn.addEventListener("click", clearFilters);
+    e.appendChild(btn);
+    box.appendChild(e);
   } else {
-    row.appendChild(el("span", "price na", "目前查無直飛報價"));
+    for (const r of rows) box.appendChild(resultBar(r));
   }
-  card.appendChild(row);
 
-  if (best) {
-    card.appendChild(el("div", "meta",
-      best.airlines + " · " + MD(best.dep) + " → " + MD(best.ret)));
+  const note = $("noDataNote");
+  if (noData.length > 0) {
+    note.textContent = "查無報價或不符日期:" + noData.join("、");
+    note.classList.remove("hidden");
+  } else {
+    note.classList.add("hidden");
   }
-  card.appendChild(el("div", "target-line", "目標價 " + NT(city.target)));
-  card.addEventListener("click", () => openDetail(city));
-  return card;
+}
+
+function resultBar({ city, best }) {
+  const bar = el("button", "bar");
+  // 第一欄:航線/航空/日期
+  const c1 = el("div");
+  c1.appendChild(el("div", "route", "桃園 → " + city.zh));
+  c1.appendChild(el("div", "airline", best.airlines));
+  c1.appendChild(el("div", "dates-txt", MD(best.dep) + " ~ " + MD(best.ret)));
+  bar.appendChild(c1);
+  // 第二欄:歷史最低
+  const hMin = city.history.length ? Math.min(...city.history.map((p) => p.min)) : null;
+  const c2 = el("div");
+  c2.appendChild(el("div", "lbl", "歷史最低價格"));
+  c2.appendChild(el("div", "val", hMin != null ? NT(hMin) : "—"));
+  bar.appendChild(c2);
+  // 第三欄:目前價格
+  const c3 = el("div");
+  const l3 = el("div", "lbl", "目前價格");
+  c3.appendChild(l3);
+  const v3 = el("div", "val now", NT(best.price));
+  if (best.price <= city.target) v3.appendChild(el("span", "chip", "▼ 低於目標價"));
+  c3.appendChild(v3);
+  c3.appendChild(el("div", "target-line", "目標 " + NT(city.target)));
+  bar.appendChild(c3);
+  // 第四欄:走勢
+  const c4 = el("div", "spark-cell");
+  c4.appendChild(el("div", "trend-lbl", "價格走勢(" + city.history.length + " 天)"));
+  c4.appendChild(sparkline(city.history));
+  bar.appendChild(c4);
+
+  bar.addEventListener("click", () => openDetail(city));
+  return bar;
 }
 
 function sparkline(history) {
-  const pts = history.slice(-14);
+  const pts = history.slice(-30);
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("viewBox", "0 0 120 36");
-  svg.setAttribute("width", "120"); svg.setAttribute("height", "36");
-  svg.classList.add("spark");
+  svg.setAttribute("viewBox", "0 0 170 44");
+  svg.setAttribute("width", "170"); svg.setAttribute("height", "44");
   svg.setAttribute("aria-hidden", "true");
-  if (pts.length < 2) return svg;
+  if (pts.length < 2) {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", "85"); t.setAttribute("y", "26");
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("fill", css("--muted")); t.setAttribute("font-size", "11");
+    t.textContent = "資料累積中";
+    svg.appendChild(t);
+    return svg;
+  }
   const vals = pts.map((p) => p.min);
   const lo = Math.min(...vals), hi = Math.max(...vals);
-  const y = (v) => hi === lo ? 18 : 30 - ((v - lo) / (hi - lo)) * 24;
-  const x = (i) => 4 + (i / (pts.length - 1)) * 108;
+  const y = (v) => hi === lo ? 22 : 38 - ((v - lo) / (hi - lo)) * 32;
+  const x = (i) => 4 + (i / (pts.length - 1)) * 158;
   const line = document.createElementNS(svgNS, "polyline");
   line.setAttribute("points", pts.map((p, i) => x(i) + "," + y(p.min)).join(" "));
   line.setAttribute("fill", "none");
-  line.setAttribute("stroke", css("--spark"));
+  line.setAttribute("stroke", css("--green"));
   line.setAttribute("stroke-width", "2");
   line.setAttribute("stroke-linecap", "round");
   line.setAttribute("stroke-linejoin", "round");
@@ -395,14 +649,12 @@ function sparkline(history) {
   dot.setAttribute("cx", x(pts.length - 1));
   dot.setAttribute("cy", y(vals[vals.length - 1]));
   dot.setAttribute("r", "3");
-  dot.setAttribute("fill", css("--accent"));
+  dot.setAttribute("fill", css("--green"));
   dot.setAttribute("stroke", css("--surface"));
   dot.setAttribute("stroke-width", "2");
   svg.appendChild(dot);
   return svg;
 }
-
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 // ---- 明細 dialog ----
 $("dClose").addEventListener("click", () => $("detail").close());
@@ -527,42 +779,38 @@ function drawChart(city) {
     t.textContent = str;
     return t;
   };
-  // 格線 + Y 軸刻度
   for (const v of niceTicks(lo, hi)) {
     svg.appendChild(line(PL, Y(v), CW - PR, Y(v), css("--grid")));
     svg.appendChild(text(PL - 8, Y(v) + 4, v.toLocaleString("zh-TW"), "end"));
   }
   svg.appendChild(line(PL, CH - PB, CW - PR, CH - PB, css("--baseline")));
-  // X 軸日期刻度(最多 5 個)
   const stepX = Math.max(1, Math.ceil(pts.length / 5));
   for (let i = 0; i < pts.length; i += stepX) {
     svg.appendChild(text(X(i), CH - PB + 18, MD(pts[i].date), "middle"));
   }
-  // 面積淡染 + 折線
   if (pts.length > 1) {
     const area = document.createElementNS(svgNS, "path");
     area.setAttribute("d",
       "M" + X(0) + "," + (CH - PB) + " " +
       pts.map((p, i) => "L" + X(i) + "," + Y(p.min)).join(" ") +
       " L" + X(pts.length - 1) + "," + (CH - PB) + " Z");
-    area.setAttribute("fill", css("--accent"));
+    area.setAttribute("fill", css("--green"));
     area.setAttribute("opacity", "0.1");
     svg.appendChild(area);
     const pl = document.createElementNS(svgNS, "polyline");
     pl.setAttribute("points", pts.map((p, i) => X(i) + "," + Y(p.min)).join(" "));
     pl.setAttribute("fill", "none");
-    pl.setAttribute("stroke", css("--accent"));
+    pl.setAttribute("stroke", css("--green"));
     pl.setAttribute("stroke-width", "2");
     pl.setAttribute("stroke-linecap", "round");
     pl.setAttribute("stroke-linejoin", "round");
     svg.appendChild(pl);
   }
-  // 端點值直接標(只標最後一點)
   const lastI = pts.length - 1;
   const endDot = document.createElementNS(svgNS, "circle");
   endDot.setAttribute("cx", X(lastI)); endDot.setAttribute("cy", Y(vals[lastI]));
   endDot.setAttribute("r", "4.5");
-  endDot.setAttribute("fill", css("--accent"));
+  endDot.setAttribute("fill", css("--green"));
   endDot.setAttribute("stroke", css("--surface"));
   endDot.setAttribute("stroke-width", "2");
   svg.appendChild(endDot);
@@ -576,13 +824,12 @@ function drawChart(city) {
   endLbl.textContent = NT(vals[lastI]);
   svg.appendChild(endLbl);
 
-  // 十字準線 + tooltip(hover 與鍵盤都可用)
   const hair = line(0, PT, 0, CH - PB, css("--baseline"));
   hair.style.display = "none";
   svg.appendChild(hair);
   const hdot = document.createElementNS(svgNS, "circle");
   hdot.setAttribute("r", "4.5");
-  hdot.setAttribute("fill", css("--accent"));
+  hdot.setAttribute("fill", css("--green"));
   hdot.setAttribute("stroke", css("--surface"));
   hdot.setAttribute("stroke-width", "2");
   hdot.style.display = "none";
