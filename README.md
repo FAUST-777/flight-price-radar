@@ -44,9 +44,9 @@ Vercel
 
 1. **Amadeus API**:到 <https://developers.amadeus.com> 註冊 → My Self-Service Workspace
    → Create New App → 拿到 `API Key` 和 `API Secret`(用免費的 test 環境即可)。
-   金鑰正本照慣例存到 `orderpally-secrets/flight-price-radar/`。
-2. **Google Sheet**:建一個新的空白 Sheet,把服務帳號(與 rent-591-tracker 共用的那個,
-   email 見憑證庫)加為**編輯者**,記下網址中的 Sheet ID。分頁不用建,掃描器會自動建立。
+   金鑰正本照慣例存進私人憑證庫。
+2. **Google Sheet**:建一個新的空白 Sheet,把既有的 Google 服務帳號加為**編輯者**,
+   記下網址中的 Sheet ID。分頁不用建,掃描器會自動建立。
 3. **GitHub Secrets**(repo → Settings → Secrets and variables → Actions):
    - `AMADEUS_API_KEY`、`AMADEUS_API_SECRET`
    - `GOOGLE_SERVICE_ACCOUNT`(服務帳號 JSON 整份貼上)

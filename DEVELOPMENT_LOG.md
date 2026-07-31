@@ -29,7 +29,7 @@
 |---|---|---|
 | 票價資料來源 | Amadeus Self-Service API(test 環境) | 免費、官方、支援 nonStop 過濾與來回報價;Skyscanner/Kiwi API 已不開放申請,爬 Google Flights 太脆弱 |
 | 排程 | GitHub Actions cron(22:30 UTC = 台灣 06:30) | 免費、可手動觸發,沿用熟悉的模式 |
-| 資料儲存 | Google Sheet(prices/targets/log 分頁) | 沿用 rent-591-tracker 的服務帳號;歷史資料可以直接開 Sheet 看 |
+| 資料儲存 | Google Sheet(prices/targets/log 分頁) | 沿用既有專案的 Google 服務帳號;歷史資料可以直接開 Sheet 看 |
 | 網頁 | 純 HTML + Vercel serverless functions(無框架) | 跟 website-qa-checker/bento-shop 同模式,好維護 |
 | 廉航過濾 | 航空公司**白名單**(BR/CI/JL/NH/JX/AE/AZ/7G) | 白名單比黑名單保險,新廉航不會漏進來;直接用 Amadeus `includedAirlineCodes` 參數,程式內再驗一次 |
 | 直飛過濾 | API `nonStop=true` + 程式驗證每段行程只有 1 個航段 | 雙重保險 |
@@ -59,7 +59,7 @@
 
 ### 待辦(使用者)
 
-1. 到 developers.amadeus.com 註冊拿 API Key/Secret(金鑰進 orderpally-secrets)
+1. 到 developers.amadeus.com 註冊拿 API Key/Secret(金鑰進私人憑證庫)
 2. 建 Google Sheet、分享給服務帳號、記 Sheet ID
 3. 設 GitHub Actions Secrets 四個值
 4. Actions 手動跑一次 daily-scan 驗證
