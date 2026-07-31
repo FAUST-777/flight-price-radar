@@ -12,23 +12,44 @@ export default async function handler(req, res) {
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
     const sheets = google.sheets({ version: "v4", auth });
-    const result = await sheets.spreadsheets.values.batchGet({
-      spreadsheetId: process.env.SHEET_ID,
-      ranges: ["prices!A2:I", "targets!A2:C"],
-    });
-    const priceRows = result.data.valueRanges[0].values || [];
-    const targetRows = result.data.valueRanges[1].values || [];
+
+    let priceRows = [], targetRows = [], gfRows = [];
+    try {
+      const result = await sheets.spreadsheets.values.batchGet({
+        spreadsheetId: process.env.SHEET_ID,
+        ranges: ["prices!A2:L", "targets!A2:C", "gf_history!A2:E"],
+      });
+      [priceRows, targetRows, gfRows] = result.data.valueRanges.map((v) => v.values || []);
+    } catch {
+      // gf_history 分頁可能還不存在(第一次新版掃描前)
+      const result = await sheets.spreadsheets.values.batchGet({
+        spreadsheetId: process.env.SHEET_ID,
+        ranges: ["prices!A2:L", "targets!A2:C"],
+      });
+      [priceRows, targetRows] = result.data.valueRanges.map((v) => v.values || []);
+    }
 
     const targets = {};
     for (const r of targetRows) targets[r[0]] = Number(r[2]) || null;
 
-    // rows: 掃描日,國家,城市,代碼,出發日,回程日,航空公司,價格,直達班次數
+    // rows: 掃描日,國家,城市,代碼,出發日,回程日,航空公司,價格,直達班次數,一般價低,一般價高,價格判斷
     const byCity = {};
     for (const r of priceRows) {
-      const [scanDate, , , code, dep, ret, airlines, price] = r;
+      const [scanDate, , , code, dep, ret, airlines, price, , low, high, judg] = r;
       if (!code || !price) continue;
       (byCity[code] ||= []).push({
         scanDate, dep, ret, airlines, price: Number(price),
+        low: Number(low) || null, high: Number(high) || null, judg: judg || "",
+      });
+    }
+
+    // gf_history: 城市代碼,出發日,回程日,日期,價格 — 各城市最便宜日期組合的 Google 60 天記錄
+    const gfByCity = {};
+    for (const r of gfRows) {
+      const [code, dep, ret, date, price] = r;
+      if (!code || !price) continue;
+      (gfByCity[code] ||= { dep, ret, history: [] }).history.push({
+        date, price: Number(price),
       });
     }
 
@@ -38,7 +59,6 @@ export default async function handler(req, res) {
       tripDays: country.tripDays,
       cities: country.cities.map((c) => {
         const rows = byCity[c.code] || [];
-        // 每個掃描日的最低價 → 歷史走勢
         const minByDay = {};
         for (const r of rows) {
           if (!minByDay[r.scanDate] || r.price < minByDay[r.scanDate]) {
@@ -48,14 +68,17 @@ export default async function handler(req, res) {
         const history = Object.entries(minByDay)
           .map(([date, min]) => ({ date, min }))
           .sort((a, b) => a.date.localeCompare(b.date));
-        // 最新一次掃描的各出發日報價
         const latestScan = rows.length
           ? rows.reduce((m, r) => (r.scanDate > m ? r.scanDate : m), "")
           : null;
         const latestOffers = rows
           .filter((r) => r.scanDate === latestScan)
           .sort((a, b) => a.price - b.price)
-          .map(({ dep, ret, airlines, price }) => ({ dep, ret, airlines, price }));
+          .map(({ dep, ret, airlines, price, low, high, judg }) => ({
+            dep, ret, airlines, price, low, high, judg,
+          }));
+        const gf = gfByCity[c.code] || null;
+        if (gf) gf.history.sort((a, b) => a.date.localeCompare(b.date));
         return {
           code: c.code,
           zh: c.zh,
@@ -64,6 +87,7 @@ export default async function handler(req, res) {
           latestScan,
           latestOffers,
           history,
+          gf,
         };
       }),
     }));

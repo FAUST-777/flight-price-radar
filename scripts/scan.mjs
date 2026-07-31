@@ -69,6 +69,31 @@ function parseOffers(html) {
   return { offers, rowCount: rows.length, hasTwd: html.includes("新台幣") };
 }
 
+// Google 依歷史資料算的「通常價格區間」與過去 60 天票價記錄,埋在頁面資料裡:
+// [null,低],[null,高],1,null,null,null,[[[時間戳,價格],[時間戳,價格],...]]
+// 時間戳是台灣時區當日零點的 epoch ms。
+function parseInsights(html) {
+  const m = html.match(/\[null,(\d{3,7})\],\[null,(\d{3,7})\],1,null,null,null,\[\[\[1[6-9]\d{11},\d/);
+  if (!m) return null;
+  const low = Number(m[1]), high = Number(m[2]);
+  const start = html.indexOf("[[[", m.index);
+  const end = html.indexOf("]]]", start);
+  if (start < 0 || end < 0) return { low, high, history: [] };
+  const history = [...html.slice(start, end + 3).matchAll(/\[(1[6-9]\d{11}),(\d{2,7})\]/g)]
+    .map((x) => ({
+      date: new Date(Number(x[1]) + 8 * 3600 * 1000).toISOString().slice(0, 10),
+      price: Number(x[2]),
+    }));
+  return { low, high, history };
+}
+
+function judgeVsTypical(price, insight) {
+  if (!insight) return "";
+  if (price > insight.high) return "偏高";
+  if (price < insight.low) return "偏低";
+  return "一般";
+}
+
 async function searchRoute(destCode, departDate, returnDate) {
   const url = gfUrl(destCode, departDate, returnDate);
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -90,7 +115,7 @@ async function searchRoute(destCode, departDate, returnDate) {
     if (parsed.offers.length === 0 && parsed.rowCount > 0 && !parsed.hasTwd) {
       throw new Error("頁面有航班但抓不到台幣價格(幣別/版面異常)");
     }
-    return parsed.offers;
+    return { offers: parsed.offers, insight: parseInsights(html) };
   }
   throw new Error("重試 3 次仍失敗(429/5xx)");
 }
@@ -118,9 +143,11 @@ const HEADERS = {
   prices: [
     "掃描日", "國家", "城市", "城市代碼", "出發日", "回程日",
     "航空公司", "價格TWD", "直達班次數",
+    "一般價低", "一般價高", "價格判斷",
   ],
   targets: ["城市代碼", "城市", "目標價TWD"],
   log: ["時間", "抓取次數", "寫入筆數", "錯誤數", "備註"],
+  gf_history: ["城市代碼", "出發日", "回程日", "日期", "價格TWD"],
 };
 
 async function ensureTabs() {
@@ -134,14 +161,15 @@ async function ensureTabs() {
         requests: missing.map((title) => ({ addSheet: { properties: { title } } })),
       },
     });
-    for (const title of missing) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SHEET_ID,
-        range: `${title}!A1`,
-        valueInputOption: "RAW",
-        requestBody: { values: [HEADERS[title]] },
-      });
-    }
+  }
+  // 標題列每次校正(欄位新增時舊分頁也會補齊)
+  for (const title of Object.keys(HEADERS)) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${title}!A1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [HEADERS[title]] },
+    });
   }
 }
 
@@ -181,19 +209,27 @@ console.log(
   `掃描 ${cities.length} 個城市 × ${offsets.length} 個出發日取樣(${todayTw})`
 );
 
+const gfRows = [];
+
 for (const city of cities) {
+  let bestPair = null; // 該城市目前最便宜的日期組合 → 它的 60 天記錄寫進 gf_history
   for (const offset of offsets) {
     const dep = addDays(todayTw, offset);
     const ret = addDays(dep, city.country.tripDays);
     try {
-      const offers = await searchRoute(city.code, dep, ret);
+      const { offers, insight } = await searchRoute(city.code, dep, ret);
       if (offers.length > 0) {
         const best = offers[0];
         rows.push([
           todayTw, city.country.name, city.zh, city.code, dep, ret,
           best.airlines, best.price, offers.length,
+          insight ? insight.low : "", insight ? insight.high : "",
+          judgeVsTypical(best.price, insight),
         ]);
-        console.log(`  ${city.zh} ${dep}→${ret}  NT$${best.price} (${best.airlines})`);
+        if (!bestPair || best.price < bestPair.price) {
+          bestPair = { price: best.price, dep, ret, insight };
+        }
+        console.log(`  ${city.zh} ${dep}→${ret}  NT$${best.price} (${best.airlines})${insight ? ` [通常${insight.low}~${insight.high} ${judgeVsTypical(best.price, insight)}]` : ""}`);
       } else {
         console.log(`  ${city.zh} ${dep}→${ret}  無直飛報價`);
       }
@@ -203,6 +239,11 @@ for (const city of cities) {
     }
     await sleep(cfg.scan.throttleMs);
   }
+  if (bestPair && bestPair.insight && bestPair.insight.history.length > 0) {
+    for (const p of bestPair.insight.history) {
+      gfRows.push([city.code, bestPair.dep, bestPair.ret, p.date, p.price]);
+    }
+  }
 }
 
 if (rows.length > 0) {
@@ -211,6 +252,20 @@ if (rows.length > 0) {
     range: "prices!A1",
     valueInputOption: "RAW",
     requestBody: { values: rows },
+  });
+}
+
+// gf_history 每次整批重寫(只保留最新的 60 天記錄)
+if (gfRows.length > 0) {
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: SHEET_ID,
+    range: "gf_history!A2:E",
+  });
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: "gf_history!A1",
+    valueInputOption: "RAW",
+    requestBody: { values: gfRows },
   });
 }
 

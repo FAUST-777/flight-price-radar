@@ -132,6 +132,13 @@ h1 { font-size: 22px; margin: 0; }
   font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: 6px;
   white-space: nowrap;
 }
+.gchip {
+  display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px;
+  border-radius: 999px; margin-left: 6px; white-space: nowrap;
+}
+.gchip.low  { color: #0ca30c; background: rgba(12,163,12,0.14); }
+.gchip.high { color: #ec835a; background: rgba(236,131,90,0.14); }
+.gchip.mid  { color: var(--muted); background: var(--surface-2); }
 .bar .target-line { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
 .bar .trend-lbl { color: var(--green-ui); font-size: 12px; margin-bottom: 2px; }
 .bar .spark-cell { justify-self: end; text-align: right; min-width: 0; }
@@ -272,6 +279,10 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
   <div id="historyTable" class="hidden"></div>
   <div class="offers-title" id="offersTitle"></div>
   <div id="offersBox"></div>
+  <div class="offers-title" id="gfTitle"></div>
+  <div class="chart-box" id="gfBox">
+    <div class="tooltip" id="gfTip"></div>
+  </div>
   <div class="target-edit">
     <label for="targetInput">目標價 NT$</label>
     <input id="targetInput" type="number" min="1000" step="100">
@@ -324,20 +335,32 @@ function demoData() {
       });
     }
     const last = history[history.length - 1].min;
+    const lowT = Math.round(base * 0.85 / 100) * 100, highT = Math.round(base * 1.2 / 100) * 100;
     const offers = [0, 21, 42, 63, 84].map((off, j) => {
       const dep = new Date(Date.now() + (14 + off) * 86400000);
       const ret = new Date(dep.getTime() + 5 * 86400000);
+      const price = Math.round((last * (1 + j * 0.06)) / 10) * 10;
       return {
         dep: dep.toISOString().slice(0, 10),
         ret: ret.toISOString().slice(0, 10),
         airlines: ["長榮航空", "中華航空", "星宇航空"][j % 3],
-        price: Math.round((last * (1 + j * 0.06)) / 10) * 10,
+        price, low: lowT, high: highT,
+        judg: price > highT ? "偏高" : price < lowT ? "偏低" : "一般",
       };
     });
+    const gfHistory = [];
+    for (let i = 60; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      gfHistory.push({
+        date: d.toISOString().slice(0, 10),
+        price: Math.round((base * (1 + Math.sin(i * 0.35) * 0.12)) / 10) * 10,
+      });
+    }
     return {
       code, zh, en, target: Math.round(base * 1.02 / 100) * 100,
       latestScan: history[history.length - 1].date,
       latestOffers: offers, history,
+      gf: { dep: offers[0].dep, ret: offers[0].ret, history: gfHistory },
     };
   };
   return {
@@ -604,8 +627,15 @@ function resultBar({ city, best }) {
   c3.appendChild(l3);
   const v3 = el("div", "val now", NT(best.price));
   if (best.price <= city.target) v3.appendChild(el("span", "chip", "▼ 低於目標價"));
+  if (best.judg) {
+    const cls = best.judg === "偏低" ? "low" : best.judg === "偏高" ? "high" : "mid";
+    const icon = best.judg === "偏低" ? "▼ " : best.judg === "偏高" ? "▲ " : "• ";
+    v3.appendChild(el("span", "gchip " + cls, icon + "Google判斷" + best.judg));
+  }
   c3.appendChild(v3);
-  c3.appendChild(el("div", "target-line", "目標 " + NT(city.target)));
+  const tl = el("div", "target-line", "目標 " + NT(city.target) +
+    (best.low ? " · 通常 " + NT(best.low) + "~" + NT(best.high) : ""));
+  c3.appendChild(tl);
   bar.appendChild(c3);
   // 第四欄:走勢
   const c4 = el("div", "spark-cell");
@@ -674,6 +704,7 @@ function openDetail(city) {
   drawChart(city);
   drawHistoryTable(city);
   drawOffers(city);
+  drawGfChart(city);
   $("targetInput").value = city.target;
   $("saveMsg").textContent = "";
   setView(true);
@@ -707,7 +738,7 @@ function drawOffers(city) {
   if (city.latestOffers.length === 0) return;
   const table = el("table");
   const thead = el("thead"); const tr = el("tr");
-  ["出發 → 回程", "航空公司", "價格"].forEach((h) => tr.appendChild(el("th", null, h)));
+  ["出發 → 回程", "航空公司", "價格", "Google判斷"].forEach((h) => tr.appendChild(el("th", null, h)));
   thead.appendChild(tr); table.appendChild(thead);
   const tbody = el("tbody");
   for (const o of city.latestOffers) {
@@ -717,6 +748,12 @@ function drawOffers(city) {
     const td = el("td", "num", NT(o.price));
     if (o.price <= city.target) td.appendChild(el("span", "chip", " ▼ 好價"));
     r.appendChild(td);
+    const tj = el("td");
+    if (o.judg) {
+      const cls = o.judg === "偏低" ? "low" : o.judg === "偏高" ? "high" : "mid";
+      tj.appendChild(el("span", "gchip " + cls, o.judg));
+    }
+    r.appendChild(tj);
     tbody.appendChild(r);
   }
   table.appendChild(tbody);
@@ -867,6 +904,142 @@ function drawChart(city) {
       if (d < bd) { bd = d; best = i; }
     }
     showAt(best);
+  });
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowRight") { showAt(Math.min(pts.length - 1, focusIdx < 0 ? lastI : focusIdx + 1)); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { showAt(Math.max(0, focusIdx < 0 ? lastI : focusIdx - 1)); ev.preventDefault(); }
+    if (ev.key === "Escape") hide();
+  });
+  svg.addEventListener("blur", hide);
+}
+
+// ---- Google 票價記錄圖(過去 60 天,含通常價格區間) ----
+function drawGfChart(city) {
+  const box = $("gfBox"), tip = $("gfTip");
+  [...box.querySelectorAll("svg")].forEach((s) => s.remove());
+  tip.style.display = "none";
+  const gf = city.gf;
+  const best = city.latestOffers[0];
+  if (!gf || gf.history.length < 2) {
+    $("gfTitle").textContent = "";
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  $("gfTitle").textContent =
+    "Google 票價記錄:過去 " + gf.history.length + " 天(" + MD(gf.dep) + " 出發 ~ " + MD(gf.ret) + " 回程這組日期)" +
+    (best && best.low ? " · 灰帶=相似行程通常價格 " + NT(best.low) + "~" + NT(best.high) : "");
+  const pts = gf.history;
+  const W = 660, H = 230, pl = 62, pr = 18, pt = 14, pb = 32;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("tabindex", "0");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", city.zh + " Google 過去 " + pts.length + " 天票價記錄,可用左右鍵瀏覽數值");
+  box.appendChild(svg);
+  const vals = pts.map((p) => p.price);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (best && best.low) { lo = Math.min(lo, best.low); hi = Math.max(hi, best.high); }
+  const pad = Math.max((hi - lo) * 0.1, hi * 0.02);
+  lo = Math.max(0, lo - pad); hi = hi + pad;
+  const X = (i) => pl + (i / (pts.length - 1)) * (W - pl - pr);
+  const Y = (v) => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+  const mkLine = (x1, y1, x2, y2, stroke) => {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", x1); l.setAttribute("y1", y1);
+    l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+    l.setAttribute("stroke", stroke); l.setAttribute("stroke-width", "1");
+    return l;
+  };
+  const mkText = (x, y, str, anchor) => {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("fill", css("--muted")); t.setAttribute("font-size", "11");
+    if (anchor) t.setAttribute("text-anchor", anchor);
+    t.textContent = str;
+    return t;
+  };
+  // 通常價格區間(灰帶)
+  if (best && best.low) {
+    const band = document.createElementNS(svgNS, "rect");
+    band.setAttribute("x", pl); band.setAttribute("width", W - pl - pr);
+    band.setAttribute("y", Y(best.high));
+    band.setAttribute("height", Math.max(2, Y(best.low) - Y(best.high)));
+    band.setAttribute("fill", css("--baseline"));
+    band.setAttribute("opacity", "0.25");
+    svg.appendChild(band);
+  }
+  for (const v of niceTicks(lo, hi)) {
+    svg.appendChild(mkLine(pl, Y(v), W - pr, Y(v), css("--grid")));
+    svg.appendChild(mkText(pl - 8, Y(v) + 4, v.toLocaleString("zh-TW"), "end"));
+  }
+  svg.appendChild(mkLine(pl, H - pb, W - pr, H - pb, css("--baseline")));
+  const stepX = Math.max(1, Math.ceil(pts.length / 6));
+  for (let i = 0; i < pts.length; i += stepX) {
+    svg.appendChild(mkText(X(i), H - pb + 18, MD(pts[i].date), "middle"));
+  }
+  const pline = document.createElementNS(svgNS, "polyline");
+  pline.setAttribute("points", pts.map((p, i) => X(i) + "," + Y(p.price)).join(" "));
+  pline.setAttribute("fill", "none");
+  pline.setAttribute("stroke", css("--green"));
+  pline.setAttribute("stroke-width", "2");
+  pline.setAttribute("stroke-linecap", "round");
+  pline.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(pline);
+  const lastI = pts.length - 1;
+  const endDot = document.createElementNS(svgNS, "circle");
+  endDot.setAttribute("cx", X(lastI)); endDot.setAttribute("cy", Y(vals[lastI]));
+  endDot.setAttribute("r", "4.5");
+  endDot.setAttribute("fill", css("--green"));
+  endDot.setAttribute("stroke", css("--surface"));
+  endDot.setAttribute("stroke-width", "2");
+  svg.appendChild(endDot);
+
+  const hair = mkLine(0, pt, 0, H - pb, css("--baseline"));
+  hair.style.display = "none";
+  svg.appendChild(hair);
+  const hdot = document.createElementNS(svgNS, "circle");
+  hdot.setAttribute("r", "4.5");
+  hdot.setAttribute("fill", css("--green"));
+  hdot.setAttribute("stroke", css("--surface"));
+  hdot.setAttribute("stroke-width", "2");
+  hdot.style.display = "none";
+  svg.appendChild(hdot);
+
+  let focusIdx = -1;
+  const showAt = (i) => {
+    focusIdx = i;
+    const px = X(i), py = Y(pts[i].price);
+    hair.setAttribute("x1", px); hair.setAttribute("x2", px);
+    hair.style.display = "";
+    hdot.setAttribute("cx", px); hdot.setAttribute("cy", py);
+    hdot.style.display = "";
+    tip.textContent = "";
+    tip.appendChild(el("div", "val", NT(pts[i].price)));
+    tip.appendChild(el("div", "lbl", pts[i].date));
+    tip.style.display = "block";
+    const rect = box.getBoundingClientRect();
+    const sx = rect.width / W;
+    let left = px * sx + 12;
+    if (left + 130 > rect.width) left = px * sx - 140;
+    tip.style.left = left + "px";
+    tip.style.top = Math.max(0, py * (rect.height / H) - 48) + "px";
+  };
+  const hide = () => {
+    hair.style.display = "none"; hdot.style.display = "none";
+    tip.style.display = "none"; focusIdx = -1;
+  };
+  svg.addEventListener("pointermove", (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const mx = ((ev.clientX - rect.left) / rect.width) * W;
+    let bi = 0, bd = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const d = Math.abs(X(i) - mx);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    showAt(bi);
   });
   svg.addEventListener("pointerleave", hide);
   svg.addEventListener("keydown", (ev) => {
