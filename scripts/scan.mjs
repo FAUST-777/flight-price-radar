@@ -37,6 +37,7 @@ const addDays = (isoDate, n) => {
 // ---- Google 航班抓取與解析 ----
 let fetchCount = 0;
 const errors = [];
+let emptyPageDiag = null; // 第一個「完全沒航班列」頁面的診斷資訊
 
 function gfUrl(destCode, departDate, returnDate) {
   const q = `${cfg.origin} to ${destCode} round trip ${departDate} through ${returnDate} nonstop`;
@@ -114,6 +115,12 @@ async function searchRoute(destCode, departDate, returnDate) {
     const parsed = parseOffers(html);
     if (parsed.offers.length === 0 && parsed.rowCount > 0 && !parsed.hasTwd) {
       throw new Error("頁面有航班但抓不到台幣價格(幣別/版面異常)");
+    }
+    if (parsed.rowCount === 0 && !emptyPageDiag) {
+      emptyPageDiag = {
+        title: (html.match(/<title>([^<]*)</) || [])[1] || "(無標題)",
+        len: html.length,
+      };
     }
     return { offers: parsed.offers, insight: parseInsights(html) };
   }
@@ -200,6 +207,18 @@ async function seedTargets() {
 await ensureTabs();
 await seedTargets();
 
+// 當日冪等:今天已經掃成功就跳過(排程一天跑三次,是為了 runner IP 被擋時自動重試)
+if (process.env.FORCE_SCAN !== "true" && process.env.FORCE_SCAN !== "1") {
+  const scanned = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: "prices!A:A",
+  });
+  if ((scanned.data.values || []).some((r) => r[0] === todayTw)) {
+    console.log(`今天(${todayTw})已有掃描資料,跳過本次執行`);
+    process.exit(0);
+  }
+}
+
 const rows = [];
 const offsets = sampleOffsets();
 const cities = cfg.countries.flatMap((country) =>
@@ -269,6 +288,9 @@ if (gfRows.length > 0) {
   });
 }
 
+// 全部航線都拿不到任何航班列 → 極可能是這台 runner 的 IP 被 Google 降級,標記失敗讓下一班排程重試
+const suspectedBlock = rows.length === 0 && emptyPageDiag !== null;
+
 await sheets.spreadsheets.values.append({
   spreadsheetId: SHEET_ID,
   range: "log!A1",
@@ -277,10 +299,16 @@ await sheets.spreadsheets.values.append({
     values: [[
       new Date(Date.now() + 8 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19) + " (台灣時間)",
       fetchCount, rows.length, errors.length,
-      errors.slice(0, 5).join(" | "),
+      (suspectedBlock
+        ? `疑似被擋:頁面無航班列(title=${emptyPageDiag.title}, len=${emptyPageDiag.len})。`
+        : "") + errors.slice(0, 5).join(" | "),
     ]],
   },
 });
 
 console.log(`完成:抓取 ${fetchCount} 次,寫入 ${rows.length} 筆,錯誤 ${errors.length} 筆`);
+if (suspectedBlock) {
+  console.error(`疑似被 Google 降級(所有頁面無航班列)。診斷:title=${emptyPageDiag.title}, len=${emptyPageDiag.len}`);
+  process.exit(1);
+}
 if (errors.length > 0 && rows.length === 0) process.exit(1);

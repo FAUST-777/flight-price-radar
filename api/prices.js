@@ -71,9 +71,16 @@ export default async function handler(req, res) {
         const latestScan = rows.length
           ? rows.reduce((m, r) => (r.scanDate > m ? r.scanDate : m), "")
           : null;
+        const seenPair = new Set();
         const latestOffers = rows
           .filter((r) => r.scanDate === latestScan)
           .sort((a, b) => a.price - b.price)
+          .filter((r) => {
+            const k = r.dep + "|" + r.ret;
+            if (seenPair.has(k)) return false; // 同日強制重掃會有重複日期組合,保留最便宜
+            seenPair.add(k);
+            return true;
+          })
           .map(({ dep, ret, airlines, price, low, high, judg }) => ({
             dep, ret, airlines, price, low, high, judg,
           }));
