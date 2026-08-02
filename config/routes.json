@@ -10,6 +10,14 @@
     "sampleIntervalDays": 14,
     "throttleMs": 2500
   },
+  "focusWindows": [
+    {
+      "countryKey": "japan",
+      "from": "2026-10-22",
+      "to": "2026-10-28",
+      "note": "10/25 前後日本行,這區間每天掃"
+    }
+  ],
   "countries": [
     {
       "key": "japan",

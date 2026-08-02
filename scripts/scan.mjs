@@ -139,6 +139,18 @@ function sampleOffsets() {
   return out;
 }
 
+// 該城市今天要掃的出發日:固定取樣 + 關注日期窗(focusWindows,例如 10/25 前後每天掃)
+function departDatesFor(city) {
+  const dates = new Set(sampleOffsets().map((off) => addDays(todayTw, off)));
+  for (const w of cfg.focusWindows || []) {
+    if (w.countryKey !== city.country.key) continue;
+    for (let d = w.from; d <= w.to; d = addDays(d, 1)) {
+      if (d > todayTw) dates.add(d);
+    }
+  }
+  return [...dates].sort();
+}
+
 // ---- Google Sheets ----
 const auth = new google.auth.GoogleAuth({
   credentials: JSON.parse(GOOGLE_SERVICE_ACCOUNT),
@@ -220,20 +232,18 @@ if (process.env.FORCE_SCAN !== "true" && process.env.FORCE_SCAN !== "1") {
 }
 
 const rows = [];
-const offsets = sampleOffsets();
 const cities = cfg.countries.flatMap((country) =>
   country.cities.map((c) => ({ ...c, country }))
 );
 console.log(
-  `掃描 ${cities.length} 個城市 × ${offsets.length} 個出發日取樣(${todayTw})`
+  `掃描 ${cities.length} 個城市(${todayTw},固定取樣 ${sampleOffsets().length} 天 + 關注日期窗)`
 );
 
 const gfRows = [];
 
 for (const city of cities) {
   let bestPair = null; // 該城市目前最便宜的日期組合 → 它的 60 天記錄寫進 gf_history
-  for (const offset of offsets) {
-    const dep = addDays(todayTw, offset);
+  for (const dep of departDatesFor(city)) {
     const ret = addDays(dep, city.country.tripDays);
     try {
       const { offers, insight } = await searchRoute(city.code, dep, ret);
