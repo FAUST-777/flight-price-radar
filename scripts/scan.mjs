@@ -244,7 +244,8 @@ const gfRows = [];
 for (const city of cities) {
   let bestPair = null; // 該城市目前最便宜的日期組合 → 它的 60 天記錄寫進 gf_history
   for (const dep of departDatesFor(city)) {
-    const ret = addDays(dep, city.country.tripDays);
+    // tripDays 是中文慣例的「N 天 N-1 夜」:5 天 = 出發日+4 回程
+    const ret = addDays(dep, city.country.tripDays - 1);
     try {
       const { offers, insight } = await searchRoute(city.code, dep, ret);
       if (offers.length > 0) {

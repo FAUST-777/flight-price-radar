@@ -630,9 +630,23 @@ function render() {
 
   if (rows.length === 0) {
     const e = el("div", "empty");
-    e.appendChild(el("div", null, anyChecked
+    let msg = anyChecked
       ? "這個日期區間內沒有雷達的取樣出發日——不是沒航班,是雷達沒盯這幾天(定點監測,不是即時搜尋)。點下面有資料的日期,或到 Google 航班即時查:"
-      : "還沒勾選任何城市"));
+      : "還沒勾選任何城市";
+    if (anyChecked && state.dep && state.ret) {
+      const span = Math.round((new Date(state.ret) - new Date(state.dep)) / 86400000) + 1;
+      const trips = state.data.countries
+        .filter((c) => state.countries.has(c.key) && c.cities.some((x) => state.cities.has(x.code)))
+        .map((c) => c.name + " " + c.tripDays + " 天");
+      const minTrip = Math.min(...state.data.countries
+        .filter((c) => state.countries.has(c.key) && c.cities.some((x) => state.cities.has(x.code)))
+        .map((c) => c.tripDays));
+      if (span < minTrip) {
+        msg = "你選的區間只有 " + span + " 天,塞不下一趟行程(雷達監測的行程長度:" + trips.join("、") +
+          ")。去程日期到回程日期至少要跨滿行程天數,例如去程 10/23 → 回程 10/27 就是 5 天。";
+      }
+    }
+    e.appendChild(el("div", null, msg));
     if (anyChecked) {
       const chips = el("div", "date-chips");
       chips.style.justifyContent = "center";
