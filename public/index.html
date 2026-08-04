@@ -91,6 +91,14 @@ h1 { font-size: 22px; margin: 0; }
 }
 .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
 .hint.warn { color: var(--critical); }
+.date-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.date-chips .dc-label { color: var(--muted); font-size: 12px; margin-right: 4px; }
+.date-chip {
+  border: 1px solid var(--border-dim); background: var(--surface-2); color: var(--ink-2);
+  border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+}
+.date-chip[aria-pressed="true"] { border-color: var(--border); color: var(--green-ui); background: var(--green-bg); font-weight: 700; }
+.gf-link { color: var(--green-ui); font-size: 12.5px; text-decoration: none; border-bottom: 1px dotted var(--green-ui); margin-left: 4px; white-space: nowrap; }
 .hint .link { color: var(--green-ui); cursor: pointer; text-decoration: underline; background: none; border: none; font: inherit; padding: 0; }
 
 .city-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -231,6 +239,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
       </div>
     </div>
     <div class="hint" id="dateHint"></div>
+    <div class="date-chips" id="depDateChips"></div>
   </div>
 
   <!-- 篩選三:去程/回程城市 -->
@@ -267,6 +276,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
   <div class="d-head">
     <h3 id="dTitle"></h3>
     <span class="sub" id="dSub"></span>
+    <a class="gf-link" id="gfLink" target="_blank" rel="noopener">在 Google 航班開啟 ↗</a>
     <button class="d-close" id="dClose">關閉 ✕</button>
   </div>
   <div class="view-toggle" role="group" aria-label="檢視方式">
@@ -465,11 +475,12 @@ function buildFilters() {
   const { lo, hi } = dataRange();
   const dh = $("dateHint");
   dh.textContent = lo
-    ? "留空=不限。目前資料涵蓋出發 " + lo + " ~ 回程 " + hi + "(每天掃描的取樣日)"
+    ? "留空=不限。雷達是定點監測(不是即時搜尋):只盯下面列出的取樣出發日;想即時查其他日期,點城市明細裡的「在 Google 航班開啟」。"
     : "尚無報價資料";
   const dep = $("depDate"), ret = $("retDate");
   dep.value = state.dep; ret.value = state.ret;
   if (lo) { dep.min = lo; dep.max = hi; ret.min = state.dep || lo; ret.max = hi; }
+  renderDateChips($("depDateChips"));
 
   // 城市(去程可勾,回程鎖定跟隨)
   const depBox = $("depCities"), retBox = $("retCities");
@@ -505,6 +516,39 @@ function buildFilters() {
       g.appendChild(list);
       box.appendChild(g);
     }
+  }
+}
+
+// 有資料的取樣出發日(點了 = 只看該日以後出發)
+function availableDeps() {
+  const set = new Set();
+  for (const c of state.data.countries) {
+    if (!state.countries.has(c.key)) continue;
+    for (const city of c.cities) {
+      for (const o of city.latestOffers) set.add(o.dep);
+    }
+  }
+  return [...set].sort();
+}
+
+function renderDateChips(box) {
+  box.textContent = "";
+  const deps = availableDeps();
+  if (deps.length === 0) return;
+  box.appendChild(el("span", "dc-label", "有資料的出發日(點選=看該日起):"));
+  for (const d of deps) {
+    const b = el("button", "date-chip", MD(d));
+    b.title = d;
+    b.setAttribute("aria-pressed", String(state.dep === d));
+    b.addEventListener("click", () => {
+      state.dep = state.dep === d ? "" : d;
+      if (state.ret && state.ret < state.dep) state.ret = "";
+      $("depDate").value = state.dep;
+      $("retDate").value = state.ret;
+      renderDateChips(box);
+      render();
+    });
+    box.appendChild(b);
   }
 }
 
@@ -587,8 +631,14 @@ function render() {
   if (rows.length === 0) {
     const e = el("div", "empty");
     e.appendChild(el("div", null, anyChecked
-      ? "沒有符合篩選條件的航線(可能日期範圍太窄,掃描取樣日見上方提示)"
+      ? "這個日期區間內沒有雷達的取樣出發日——不是沒航班,是雷達沒盯這幾天(定點監測,不是即時搜尋)。點下面有資料的日期,或到 Google 航班即時查:"
       : "還沒勾選任何城市"));
+    if (anyChecked) {
+      const chips = el("div", "date-chips");
+      chips.style.justifyContent = "center";
+      renderDateChips(chips);
+      e.appendChild(chips);
+    }
     const btn = el("button", "link", "清除全部篩選");
     btn.style.cssText = "margin-top:10px;background:none;border:1px solid var(--border);color:var(--green-ui);border-radius:8px;padding:6px 16px;cursor:pointer;font:inherit;font-size:13px;";
     btn.addEventListener("click", clearFilters);
@@ -701,6 +751,12 @@ function openDetail(city) {
   state.openCity = city;
   $("dTitle").textContent = city.zh + "(" + city.en + ")";
   $("dSub").textContent = "每日最低直飛來回價";
+  const linkOffer = matchedOffers(city)[0] || city.latestOffers[0];
+  const linkDep = state.dep || (linkOffer && linkOffer.dep);
+  const linkRet = linkOffer && linkOffer.ret;
+  $("gfLink").href = "https://www.google.com/travel/flights?hl=zh-TW&curr=TWD&q=" +
+    encodeURIComponent("TPE to " + city.code + " round trip" +
+      (linkDep && linkRet ? " " + linkDep + " through " + linkRet : "") + " nonstop");
   drawChart(city);
   drawHistoryTable(city);
   drawOffers(city);
