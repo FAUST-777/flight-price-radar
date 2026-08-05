@@ -266,6 +266,22 @@ footer { margin-top: 40px; color: var(--muted); font-size: 12px; border-top: 1px
   <div class="results" id="results"></div>
   <div class="no-data-note hidden" id="noDataNote"></div>
 
+  <section class="panel hidden" id="bandsSection">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+      <span class="row-label">📊 日本月份價格帶</span>
+      <span class="hint" style="margin-top:0;">綠帶=Google 歷史常態區間(近年訂票統計)· 圓點=目前最低價 · 點在帶下方=比歷史常態便宜</span>
+    </div>
+    <div class="chips" id="bandCityChips" style="margin-top:12px;"></div>
+    <div class="chart-box" id="bandBox" style="margin-top:10px;">
+      <div class="tooltip" id="bandTip"></div>
+    </div>
+    <div id="bandTable" class="hidden" style="margin-top:10px;"></div>
+    <div class="view-toggle" style="margin-top:8px;">
+      <button id="bandBtnChart" aria-pressed="true">圖表</button>
+      <button id="bandBtnTable" aria-pressed="false">表格</button>
+    </div>
+  </section>
+
   <footer>
     資料來源:Google 航班 · 每日台灣時間 06:30 自動掃描 ·
     顯示的是查詢當下的最低直飛來回報價,訂票前請以航空公司官網為準。
@@ -1150,7 +1166,212 @@ $("targetSave").addEventListener("click", async () => {
   }
 });
 
-load();
+// ---- 日本月份價格帶 ----
+state.bands = null;
+state.bandCity = "ALL";
+
+function demoBands() {
+  const cities = ["TYO", "OSA", "FUK"].map((code, ci) => {
+    const zh = { TYO: "東京", OSA: "大阪", FUK: "福岡" }[code];
+    const months = [];
+    const now = new Date();
+    for (let i = 1; i <= 11; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      const seasonal = 1 + 0.25 * Math.sin((d.getMonth() - 2) * 0.55);
+      const base = (8000 + ci * 1500) * seasonal;
+      months.push({
+        month: ym,
+        low: Math.round(base * 0.75 / 100) * 100,
+        high: Math.round(base * 1.25 / 100) * 100,
+        current: Math.round(base * (0.7 + ((i * 7 + ci * 3) % 10) / 12) / 10) * 10,
+        samples: [],
+      });
+    }
+    return { code, zh, months };
+  });
+  return { updatedAt: new Date().toISOString().slice(0, 10), cities };
+}
+
+async function loadBands() {
+  if (state.demo) {
+    state.bands = demoBands();
+  } else {
+    try {
+      const res = await fetch("/api/bands");
+      const data = await res.json();
+      if (!res.ok || data.error || !data.cities || data.cities.length === 0) return;
+      state.bands = data;
+    } catch { return; }
+  }
+  $("bandsSection").classList.remove("hidden");
+  buildBandChips();
+  renderBands();
+}
+
+function bandCityData() {
+  const b = state.bands;
+  if (state.bandCity !== "ALL") return b.cities.find((c) => c.code === state.bandCity);
+  // 全部=各月取所有城市中的最低(便宜城市代表「飛日本」的地板價)
+  const byMonth = {};
+  for (const c of b.cities) {
+    for (const m of c.months) {
+      const t = (byMonth[m.month] ||= { month: m.month, low: null, high: null, current: null });
+      if (m.low != null) t.low = t.low == null ? m.low : Math.min(t.low, m.low);
+      if (m.high != null) t.high = t.high == null ? m.high : Math.min(t.high, m.high);
+      if (m.current != null) t.current = t.current == null ? m.current : Math.min(t.current, m.current);
+    }
+  }
+  return {
+    code: "ALL", zh: "全部(最低)",
+    months: Object.values(byMonth).sort((a, b2) => a.month.localeCompare(b2.month)),
+  };
+}
+
+function buildBandChips() {
+  const box = $("bandCityChips");
+  box.textContent = "";
+  const opts = [{ code: "ALL", zh: "全部(最低)" }, ...state.bands.cities];
+  for (const o of opts) {
+    const b = el("button", "chip-btn", o.zh);
+    b.style.padding = "4px 14px";
+    b.style.fontSize = "13px";
+    b.setAttribute("aria-pressed", String(state.bandCity === o.code));
+    b.addEventListener("click", () => {
+      state.bandCity = o.code;
+      buildBandChips(); renderBands();
+    });
+    box.appendChild(b);
+  }
+}
+
+$("bandBtnChart").addEventListener("click", () => setBandView(true));
+$("bandBtnTable").addEventListener("click", () => setBandView(false));
+function setBandView(chart) {
+  $("bandBtnChart").setAttribute("aria-pressed", String(chart));
+  $("bandBtnTable").setAttribute("aria-pressed", String(!chart));
+  $("bandBox").classList.toggle("hidden", !chart);
+  $("bandTable").classList.toggle("hidden", chart);
+}
+
+function renderBands() {
+  const data = bandCityData();
+  if (!data) return;
+  const months = data.months.filter((m) => m.low != null || m.current != null);
+  const box = $("bandBox"), tip = $("bandTip");
+  [...box.querySelectorAll("svg")].forEach((s) => s.remove());
+  tip.style.display = "none";
+
+  // 表格
+  const tbox = $("bandTable");
+  tbox.textContent = "";
+  const table = el("table");
+  const tr0 = el("tr");
+  ["月份", "歷史常態區間", "目前最低", "相對位置"].forEach((h) => tr0.appendChild(el("th", null, h)));
+  const thead = el("thead"); thead.appendChild(tr0); table.appendChild(thead);
+  const tbody = el("tbody");
+  for (const m of months) {
+    const r = el("tr");
+    r.appendChild(el("td", null, m.month));
+    r.appendChild(el("td", null, m.low != null ? NT(m.low) + " ~ " + NT(m.high) : "—"));
+    r.appendChild(el("td", "num", m.current != null ? NT(m.current) : "—"));
+    const pos = el("td");
+    if (m.current != null && m.low != null) {
+      const j = m.current > m.high ? "偏高" : m.current < m.low ? "偏低" : "一般";
+      const cls = j === "偏低" ? "low" : j === "偏高" ? "high" : "mid";
+      pos.appendChild(el("span", "gchip " + cls, j));
+    }
+    r.appendChild(pos);
+    tbody.appendChild(r);
+  }
+  table.appendChild(tbody);
+  tbox.appendChild(table);
+
+  if (months.length === 0) return;
+
+  // 圖表:每月一條「常態區間」浮動帶 + 目前最低價圓點
+  const W = 760, H = 260, pl = 62, pr = 14, pt = 16, pb = 32;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", data.zh + " 未來各月份價格帶,表格檢視有完整數值");
+  box.appendChild(svg);
+  const vals = [];
+  for (const m of months) {
+    if (m.low != null) vals.push(m.low);
+    if (m.high != null) vals.push(m.high);
+    if (m.current != null) vals.push(m.current);
+  }
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = Math.max((hi - lo) * 0.08, hi * 0.02);
+  lo = Math.max(0, lo - pad); hi = hi + pad;
+  const slot = (W - pl - pr) / months.length;
+  const X = (i) => pl + slot * i + slot / 2;
+  const Y = (v) => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+  const mkText = (x, y, str, anchor) => {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("fill", css("--muted")); t.setAttribute("font-size", "11");
+    if (anchor) t.setAttribute("text-anchor", anchor);
+    t.textContent = str;
+    return t;
+  };
+  for (const v of niceTicks(lo, hi)) {
+    const l = document.createElementNS(svgNS, "line");
+    l.setAttribute("x1", pl); l.setAttribute("y1", Y(v));
+    l.setAttribute("x2", W - pr); l.setAttribute("y2", Y(v));
+    l.setAttribute("stroke", css("--grid")); l.setAttribute("stroke-width", "1");
+    svg.appendChild(l);
+    svg.appendChild(mkText(pl - 8, Y(v) + 4, v.toLocaleString("zh-TW"), "end"));
+  }
+  months.forEach((m, i) => {
+    svg.appendChild(mkText(X(i), H - pb + 18, Number(m.month.slice(5)) + "月", "middle"));
+    if (m.low != null) {
+      const band = document.createElementNS(svgNS, "rect");
+      const bw = Math.min(24, slot * 0.5);
+      band.setAttribute("x", X(i) - bw / 2);
+      band.setAttribute("y", Y(m.high));
+      band.setAttribute("width", bw);
+      band.setAttribute("height", Math.max(3, Y(m.low) - Y(m.high)));
+      band.setAttribute("rx", "4");
+      band.setAttribute("fill", css("--green"));
+      band.setAttribute("opacity", "0.25");
+      svg.appendChild(band);
+    }
+    if (m.current != null) {
+      const dot = document.createElementNS(svgNS, "circle");
+      dot.setAttribute("cx", X(i)); dot.setAttribute("cy", Y(m.current));
+      dot.setAttribute("r", "4.5");
+      dot.setAttribute("fill", css("--green"));
+      dot.setAttribute("stroke", css("--surface"));
+      dot.setAttribute("stroke-width", "2");
+      svg.appendChild(dot);
+    }
+    // 每月整欄都是 hover 目標
+    const hit = document.createElementNS(svgNS, "rect");
+    hit.setAttribute("x", pl + slot * i); hit.setAttribute("y", pt);
+    hit.setAttribute("width", slot); hit.setAttribute("height", H - pt - pb);
+    hit.setAttribute("fill", "transparent");
+    hit.addEventListener("pointermove", () => {
+      tip.textContent = "";
+      tip.appendChild(el("div", "val", m.current != null ? NT(m.current) : "尚無報價"));
+      tip.appendChild(el("div", "lbl", m.month + " 目前最低"));
+      if (m.low != null) tip.appendChild(el("div", "lbl", "常態 " + NT(m.low) + "~" + NT(m.high)));
+      tip.style.display = "block";
+      const rect = box.getBoundingClientRect();
+      const sx = rect.width / W;
+      let left = X(i) * sx + 12;
+      if (left + 150 > rect.width) left = X(i) * sx - 160;
+      tip.style.left = left + "px";
+      tip.style.top = Math.max(0, Y(m.current != null ? m.current : (m.high || hi)) * (rect.height / H) - 52) + "px";
+    });
+    hit.addEventListener("pointerleave", () => { tip.style.display = "none"; });
+    svg.appendChild(hit);
+  });
+}
+
+load().then(loadBands);
 </script>
 </body>
 </html>

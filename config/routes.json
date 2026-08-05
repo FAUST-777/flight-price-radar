@@ -10,6 +10,7 @@
     "sampleIntervalDays": 14,
     "throttleMs": 2500
   },
+  "bandCities": ["TYO", "OSA", "NGO", "FUK", "SPK", "OKA"],
   "focusWindows": [
     {
       "countryKey": "japan",
